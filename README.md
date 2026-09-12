@@ -39,7 +39,9 @@ Recomendação priorizada na Home, em três camadas:
 - **Priorização** — heurística explicável, sem caixa-preta, que ordena o que resolver primeiro.
 - **Texto** — a frase mostra o *porquê* com números reais: *"Está vencida há 1.200 km. Você roda cerca de 850 km por mês."*
 
-O CTA abre o agendamento com os serviços já pré-selecionados. Os números nunca saem de um modelo generativo — vêm da camada de sinais.
+- **Redação** — uma Edge Function no Supabase recebe o vetor já calculado e reescreve a recomendação em linguagem natural. Ela não decide nada: se o texto citar qualquer número que a camada de sinais não produziu, a resposta é descartada. Com a função fora do ar, em timeout ou em modo avião, o texto determinístico continua na tela e nada quebra.
+
+O CTA abre o agendamento com os serviços já pré-selecionados. Os números nunca saem de um modelo generativo — vêm da camada de sinais. A chave da API fica em `supabase secrets`, nunca no bundle: variável com prefixo `EXPO_PUBLIC_` é embutida no APK e qualquer pessoa consegue lê-la.
 
 ### Lembretes proativos
 O app agenda notificação local para o alerta que está prestes a vencer, com data calculada pelo ritmo de uso real do veículo, não por prazo fixo. É o *lead de serviço proativo* do desafio, entregue no celular do cliente sem custo de infraestrutura.
@@ -123,6 +125,13 @@ cp .env.example .env      # preencha com as chaves do Supabase
 npx expo start
 ```
 
+Para ativar a camada 3 do Copiloto (opcional — sem ela o app usa o texto determinístico):
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase functions deploy copiloto-texto
+```
+
 No Supabase, execute uma vez o arquivo **`supabase/000_sprint3_completo.sql`** no SQL Editor. Ele reúne todas as migrações na ordem correta, é idempotente, e a última query devolve uma linha de conferência — as cinco colunas devem voltar com `1`.
 
 ### Build do APK
@@ -168,7 +177,7 @@ constants/              tokens de design, regras, categorias, concessionárias
 contexts/               UserContext (perfil, veículos, manutenções)
 hooks/                  useAlerts, useProactiveReminders
 services/               Supabase: auth, vehicle, maintenance, agendamentos, benefits, auditLog
-supabase/               migrações SQL
+supabase/               migrações SQL e Edge Function do Copiloto
 utils/                  lógica pura: vin, alerts, copiloto, formatação
 __tests__/              suíte Jest das funções puras
 docs/                   backlog, roteiro de entrega e Cybersecurity
@@ -194,7 +203,7 @@ Jest com o preset `jest-expo`. Toda a lógica de negócio vive em funções pura
 a suíte roda sem mock, sem renderizar componente e sem rede.
 
 ```bash
-npm test              # 101 testes
+npm test              # 123 testes
 npm run test:coverage # relatório de cobertura
 npm run typecheck     # tsc --noEmit
 ```
@@ -207,6 +216,7 @@ npm run typecheck     # tsc --noEmit
 | `__tests__/serviceCategories.test.ts` | classificação por tipo e por palavra-chave em texto livre, insensível a acento e caixa |
 | `__tests__/safeError.test.ts` | garantia de que nome de tabela, política RLS e stack trace nunca chegam à interface |
 | `__tests__/formatters.test.ts` | formatação pt-BR de km e datas, cálculo de dias decorridos e restantes |
+| `__tests__/copilotoTexto.test.ts` | camada 3 do Copiloto: resposta malformada caindo no texto determinístico, guarda contra número inventado, payload sem dado pessoal |
 
 Vários testes nasceram de bugs reais encontrados em uso — o desempate por
 quilometragem e a ordenação do `ERROR_MAP` são dois deles.

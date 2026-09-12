@@ -12,9 +12,12 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '@/contexts/UserContext';
 import { computeAlerts } from '@/hooks/useAlerts';
-import { recomendacaoPrincipal } from '@/utils/copiloto';
+import { recomendacaoPrincipal, estimarKmPorMes } from '@/utils/copiloto';
+import { montarEntrada } from '@/utils/copilotoTexto';
+import { useCopilotoTexto } from '@/hooks/useCopilotoTexto';
 import { atualizarKm } from '@/services/vehicle';
 import { VehicleCard } from '@/components/VehicleCard';
+import { TextoSuave } from '@/components/TextoSuave';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +46,24 @@ export default function HomeScreen() {
     ? 'atencao'
     : 'ok';
   const pendentes = currentAlerts.filter((a) => a.status !== 'ok').length;
+
+  // Camada 3 do Copiloto: o corpo determinístico é o que aparece primeiro; se a
+  // Edge Function responder dentro do prazo e os números baterem, o texto
+  // redigido entra no lugar. Falha, timeout ou divergência mantêm este aqui.
+  const alertaDaRecomendacao = recomendacao
+    ? currentAlerts.find((a) => a.type === recomendacao.alertType) ?? null
+    : null;
+  const entradaCopiloto =
+    currentVehicle && recomendacao && alertaDaRecomendacao
+      ? montarEntrada(
+          currentVehicle,
+          alertaDaRecomendacao,
+          recomendacao,
+          estimarKmPorMes(currentVehicle, maintenances),
+          pendentes,
+        )
+      : null;
+  const corpoCopiloto = useCopilotoTexto(entradaCopiloto, recomendacao?.corpo ?? '');
 
   useEffect(() => {
     if (selectedVehicleIndex > 0 && vehicles.length > 1) {
@@ -181,7 +202,7 @@ export default function HomeScreen() {
               {recomendacao ? (
                 <>
                   <Text style={styles.copilotoTitulo}>{recomendacao.titulo}</Text>
-                  <Text style={styles.reportItemText}>{recomendacao.corpo}</Text>
+                  <TextoSuave style={styles.reportItemText}>{corpoCopiloto}</TextoSuave>
 
                   {pendentes > 1 && (
                     <Text style={styles.copilotoExtra}>

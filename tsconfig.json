@@ -16,6 +16,7 @@
   ],
   "exclude": [
     "node_modules",
-    "_to_delete"
+    "_to_delete",
+    "supabase/functions"
   ]
 }

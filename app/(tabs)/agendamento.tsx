@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { buscarAgendamentos, Agendamento } from '@/services/agendamentos';
+import { safeErrorMessage, logDevError } from '@/utils/safeError';
 import { useUser } from '@/contexts/UserContext';
 import { AgendamentoItem } from '@/components/AgendamentoItem';
 import { Colors, FontFamily, Spacing } from '@/constants/theme';
@@ -27,13 +28,18 @@ export default function AgendamentoScreen() {
   const [appointments, setAppointments] = useState<Agendamento[]>([]);
   const [statusFilter, setStatusFilter] = useState<(typeof FILTROS)[number]['key']>('todos');
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
+      setErro(null);
       buscarAgendamentos(user.id)
         .then(setAppointments)
-        .catch(() => {})
+        .catch((e) => {
+          logDevError('buscarAgendamentos', e);
+          setErro(safeErrorMessage(e, 'Não foi possível carregar seus agendamentos.'));
+        })
         .finally(() => setCarregando(false));
     }, [user]),
   );
@@ -98,6 +104,12 @@ export default function AgendamentoScreen() {
             <View style={styles.empty}>
               <ActivityIndicator color={Colors.primary} />
               <Text style={styles.emptyText}>Carregando seus agendamentos…</Text>
+            </View>
+          ) : erro ? (
+            <View style={styles.empty}>
+              <Ionicons name="cloud-offline-outline" size={52} color={Colors.danger} />
+              <Text style={styles.emptyTitle}>Não foi possível carregar</Text>
+              <Text style={styles.emptyText}>{erro}</Text>
             </View>
           ) : (
             <View style={styles.empty}>

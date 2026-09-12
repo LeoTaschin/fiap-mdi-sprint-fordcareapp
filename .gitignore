@@ -36,3 +36,7 @@ yarn-error.log*
 _to_delete/
 _teste.txt
 assets/screenshots/*.zip
+
+# Supabase CLI (estado local, nao faz parte da entrega)
+supabase/.temp/
+supabase/.branches/
