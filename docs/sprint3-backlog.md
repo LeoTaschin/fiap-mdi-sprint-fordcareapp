@@ -30,7 +30,9 @@ Não há critério de "inovação" nesta rubrica. A nota vem de terminar bem.
 
 **Legenda:** `[x]` concluída · `[~]` parcial, com bloqueio anotado na própria tarefa · `[ ]` aberta.
 
-Situação em 09/09: **12 concluídas, 1 parcial, 3 abertas.** Entrega da Sprint 3 em 27/09.
+Situação em 12/09: **13 concluídas, 1 parcial, 3 abertas.** Entrega da Sprint 3 em 27/09.
+
+Nenhuma tarefa aberta exige mais código de app: a 2.4 foi cortada e a 3.5/3.6 são build e verificação.
 
 ---
 
@@ -129,6 +131,51 @@ Dono atual gera código de transferência com expiração; comprador informa o c
 
 ---
 
+### [x] 2.5 — Copiloto camada 3: redação em linguagem natural · `SHOULD` · 3 pts · **Dep. 2.2**
+
+Os números continuam saindo de `utils/copiloto.ts`. A camada 3 recebe o vetor já calculado e devolve **um parágrafo curto em pt-BR**: não decide, não escolhe o serviço, não inventa valor. A frase para a banca é *"a IA não decide, ela explica"*.
+
+**Onde roda:** Edge Function `copiloto-texto` no Supabase. A chave da API fica em `supabase secrets` — nunca no bundle. Variável com prefixo `EXPO_PUBLIC_` é embutida no APK e qualquer pessoa lê abrindo o arquivo.
+
+**Contrato:**
+
+```
+POST /functions/v1/copiloto-texto
+entrada  { modelo, ano, kmAtual, kmPorMes,
+           alerta: { tipo, diasVencido, kmVencido }, pendentes, pontos }
+saída    { texto: string }        // 1 parágrafo, máximo 240 caracteres
+```
+
+A função monta o prompt com os números recebidos e instrução explícita de não criar nenhum valor novo. Do app não sai nada além desses campos — sem nome, sem e-mail, sem chassi.
+
+**Fallback obrigatório:** `recomendacaoPrincipal` continua gerando o texto determinístico. A chamada tem timeout de 2,5 s; erro, timeout ou resposta fora do formato caem no texto atual **sem mensagem de erro na tela**. A demonstração não pode depender de rede.
+
+**Onde plugar:** `utils/copiloto.ts` segue devolvendo a `Recomendacao` como hoje. A busca do texto vive num hook novo (`useCopilotoTexto`) consumido pelo card da Home: o `corpo` determinístico é o estado inicial e o texto redigido substitui quando chega.
+
+**Critério de aceite:** com a função no ar, o card da Home mostra o texto redigido; com a função fora do ar ou o aparelho em modo avião, mostra o texto determinístico e nada quebra. Nenhum número do texto redigido diverge do que a camada 1 calculou.
+
+**BDD:** *Dado* um veículo com revisão vencida, *quando* abro a Home com rede, *então* vejo uma recomendação em linguagem natural com os mesmos números do cálculo local; *e quando* abro em modo avião, *então* vejo a recomendação determinística sem erro.
+
+**Teste:** o fallback é testável sem rede — vale um caso garantindo que resposta malformada cai no template.
+
+**Responde a:** *"sugestão personalizada com uma IA que checa o status do veículo"*
+**Cybersecurity:** chave fora do bundle, payload sem dado pessoal, saída restrita a texto.
+**Não inclui:** o score de evasão por ML — depende do modelo da outra disciplina, ainda em treinamento. Continua como evolução da Sprint 4.
+
+**Status:** implementada. `supabase/functions/copiloto-texto/index.ts` (Deno) recebe só o vetor de números e devolve um parágrafo; a chave fica em `supabase secrets`, nunca no bundle. `utils/copilotoTexto.ts` concentra a validação pura e `hooks/useCopilotoTexto.ts` faz a busca com timeout de 2,5 s, mantendo o texto determinístico como estado inicial.
+
+Além do contrato previsto, entrou uma **guarda de coerência numérica**: se o texto redigido citar qualquer número que a camada 1 não calculou — um 41.200 km arredondado para 40.000, um preço inventado — a resposta é descartada e o texto local fica. É o que sustenta a frase "a IA não decide, ela explica" diante da banca.
+
+**22 testes** cobrem os caminhos de falha sem rede: resposta nula, tipo errado, vazia, acima de 240 caracteres, com markdown, com JSON aninhado, e os casos de número divergente. Verificado no build web com a função fora do ar: a Home mostra o texto determinístico, sem erro em tela e sem erro de página.
+
+**Falta só o deploy** (uma vez, na conta Supabase do Leo):
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase functions deploy copiloto-texto
+```
+
+---
+
 ## ÉPICO 3 — Acabamento e entrega (Semana 3)
 
 > É aqui que a nota de Mobile é efetivamente ganha.
@@ -176,7 +223,7 @@ Build de produção via EAS, instalar em device físico ou emulador, confirmar q
 ---
 
 ### [ ] 3.6 — Verificação final — percorrer todos os fluxos · `MUST` · 2 pts · **Dep. 3.5**
-Varredura caçando erro: cadastro, login, cadastro de veículo com VIN, atualizar KM, alertas, agendamento nas 3 etapas, confirmação de revisão, histórico, transferência, resgate de benefício, notificação. Conferir os 4 critérios da rubrica um a um.
+Varredura caçando erro: cadastro, login, cadastro de veículo com VIN, atualizar KM, alertas, agendamento nas 3 etapas, confirmação de revisão, histórico, registro de serviço fora da rede, resgate de benefício, notificação. Conferir os 4 critérios da rubrica um a um.
 
 **Critério de aceite:** nenhum botão abre alerta vazio ou deixa de fazer o que anuncia; os 4 critérios conferidos e assinados.
 
