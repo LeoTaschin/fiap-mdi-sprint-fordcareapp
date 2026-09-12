@@ -15,6 +15,7 @@ import { computeAlerts } from '@/hooks/useAlerts';
 import { AgendamentoCarCard } from '@/components/AgendamentoCarCard';
 import { ReviewCarCard } from '@/components/ReviewCarCard';
 import { FORD_DEALERSHIPS, Dealership } from '@/constants/fordDealerships';
+import { DealershipPicker } from '@/components/DealershipPicker';
 import { criarAgendamento } from '@/services/agendamentos';
 import { agendarLembrete, requestNotificationPermission } from '@/services/notifications';
 import { logAuditEvent } from '@/services/auditLog';
@@ -168,7 +169,7 @@ export default function NovoAgendamento() {
 
             {vehicles.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="car-outline" size={44} color="#C8CEDB" />
+                <Ionicons name="car-outline" size={44} color={Colors.inactive} />
                 <Text style={styles.emptyText}>Nenhum veículo cadastrado.</Text>
                 <TouchableOpacity onPress={() => router.push('/veiculo/cadastro')}>
                   <Text style={styles.emptyAction}>Cadastrar veículo →</Text>
@@ -207,7 +208,7 @@ export default function NovoAgendamento() {
               <View style={styles.problemList}>
                 {vehicleAlerts.map((alert) => {
                   const checked = selectedProblems.includes(alert.type);
-                  const accentColor = alert.status === 'urgente' ? Colors.danger : '#F5A623';
+                  const accentColor = alert.status === 'urgente' ? Colors.danger : Colors.warning;
                   const icon = SERVICE_ICONS[alert.type] ?? 'build-outline';
                   return (
                     <TouchableOpacity
@@ -227,7 +228,7 @@ export default function NovoAgendamento() {
                         </Text>
                       </View>
                       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                        {checked && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+                        {checked && <Ionicons name="checkmark" size={13} color={Colors.surface} />}
                       </View>
                     </TouchableOpacity>
                   );
@@ -235,40 +236,11 @@ export default function NovoAgendamento() {
               </View>
             )}
 
-            {/* Dealership — only if not pre-selected */}
+            {/* Seleção da concessionária — busca, distância e status vêm do picker */}
             {!preselectedDealer && (
               <>
                 <SectionTitle>Concessionária</SectionTitle>
-                <View style={styles.dealerList}>
-                  {FORD_DEALERSHIPS.map((d) => {
-                    const isSelected = selectedDealer?.id === d.id;
-                    return (
-                      <TouchableOpacity
-                        key={d.id}
-                        style={[styles.dealerChip, isSelected && styles.dealerChipSelected]}
-                        onPress={() => setSelectedDealer(d)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name="storefront-outline"
-                          size={15}
-                          color={isSelected ? '#FFFFFF' : Colors.primary}
-                        />
-                        <View style={styles.dealerChipInfo}>
-                          <Text style={[styles.dealerChipName, isSelected && styles.dealerChipNameSelected]}
-                            numberOfLines={1}>
-                            {d.name}
-                          </Text>
-                          <Text style={[styles.dealerChipSub, isSelected && { color: 'rgba(255,255,255,0.75)' }]}
-                            numberOfLines={1}>
-                            {d.neighborhood} · {d.city}
-                          </Text>
-                        </View>
-                        {isSelected && <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <DealershipPicker selecionada={selectedDealer} onSelecionar={setSelectedDealer} />
               </>
             )}
 
@@ -337,7 +309,7 @@ export default function NovoAgendamento() {
             activeOpacity={0.85}
           >
             <Text style={styles.footerBtnText}>Próximo</Text>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="chevron-forward" size={18} color={Colors.surface} />
           </TouchableOpacity>
         )}
 
@@ -349,7 +321,7 @@ export default function NovoAgendamento() {
             activeOpacity={0.85}
           >
             <Text style={styles.footerBtnText}>Revisar</Text>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="chevron-forward" size={18} color={Colors.surface} />
           </TouchableOpacity>
         )}
 
@@ -361,9 +333,9 @@ export default function NovoAgendamento() {
             activeOpacity={0.85}
           >
             {loading
-              ? <ActivityIndicator color="#FFFFFF" />
+              ? <ActivityIndicator color={Colors.surface} />
               : <>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+                  <Ionicons name="checkmark-circle-outline" size={18} color={Colors.surface} />
                   <Text style={styles.footerBtnText}>Confirmar agendamento</Text>
                 </>
             }
@@ -377,8 +349,8 @@ export default function NovoAgendamento() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F4F6FA' },
-  safeHeader: { backgroundColor: '#F4F6FA' },
+  root: { flex: 1, backgroundColor: Colors.background },
+  safeHeader: { backgroundColor: Colors.background },
 
   // Header
   header: {
@@ -399,7 +371,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D0D5E0',
+    backgroundColor: Colors.borderStrong,
   },
   stepDotActive: { backgroundColor: Colors.primary },
   stepDotDone: { backgroundColor: Colors.primaryLight ?? Colors.primary, opacity: 0.5 },
@@ -434,7 +406,7 @@ const styles = StyleSheet.create({
   problemCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1.5,
@@ -474,8 +446,8 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: '#D0D5E0',
-    backgroundColor: '#FFFFFF',
+    borderColor: Colors.borderStrong,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
@@ -489,23 +461,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   dealerChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   dealerChipInfo: { flex: 1 },
   dealerChipName: { fontFamily: FontFamily.bodyMedium, fontSize: 13, color: Colors.textPrimary },
-  dealerChipNameSelected: { color: '#FFFFFF' },
+  dealerChipNameSelected: { color: Colors.surface },
   dealerChipSub: { fontFamily: FontFamily.body, fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
 
   dealerFixed: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1.5,
@@ -516,7 +488,7 @@ const styles = StyleSheet.create({
 
   // Step 3 - Review
   reviewProblemList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     gap: Spacing.sm,
@@ -529,7 +501,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
   },
@@ -544,7 +516,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
   },
@@ -552,7 +524,7 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: FontFamily.body, fontSize: 13, color: Colors.danger, marginTop: Spacing.sm },
 
   // Footer
-  footer: { backgroundColor: '#F4F6FA', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, paddingTop: Spacing.sm },
+  footer: { backgroundColor: Colors.background, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, paddingTop: Spacing.sm },
   footerBtn: {
     backgroundColor: Colors.primary,
     borderRadius: 14,
@@ -568,5 +540,5 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   footerBtnDisabled: { opacity: 0.45, shadowOpacity: 0 },
-  footerBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: 16, color: '#FFFFFF' },
+  footerBtnText: { fontFamily: FontFamily.bodySemiBold, fontSize: 16, color: Colors.surface },
 });

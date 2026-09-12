@@ -1,21 +1,17 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Maintenance } from '@/contexts/UserContext';
 import { Colors, FontFamily, Spacing } from '@/constants/theme';
+import { CATEGORIAS, categoriaDoServico } from '@/constants/serviceCategories';
 
 export type MaintenanceGroup = {
   date: Date;
   dealership: string;
+  /** Ex.: "Ford Ranger 2021" — indefinido quando o veículo não é identificável. */
+  vehicleLabel?: string;
   items: Maintenance[];
   totalPoints: number;
-};
-
-const SERVICE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
-  'Troca de Óleo':    'water-outline',
-  'Revisão Geral':    'construct-outline',
-  'Rodízio de Pneus': 'disc-outline',
-  'Filtro de Ar':     'funnel-outline',
-  'Outro':            'build-outline',
 };
 
 function formatDate(date: Date): string {
@@ -24,33 +20,96 @@ function formatDate(date: Date): string {
   });
 }
 
-type Props = { group: MaintenanceGroup };
+// LayoutAnimation precisa ser habilitada explicitamente no Android.
+// Se não estiver disponível, a expansão simplesmente acontece sem animar.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
-export function HistoricoItem({ group }: Props) {
+type Props = {
+  group: MaintenanceGroup;
+  /** A visita mais recente já abre expandida; as demais começam recolhidas. */
+  aberturaInicial?: boolean;
+};
+
+export function HistoricoItem({ group, aberturaInicial = false }: Props) {
+  // Um grupo nasce de uma visita só, então todos os itens compartilham a origem.
+  const foraDaRede = group.items.length > 0 && group.items.every((i) => i.inNetwork === false);
+
+  const [aberto, setAberto] = useState(aberturaInicial);
+
+  function alternar() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAberto((v) => !v);
+  }
+
+  const qtd = group.items.length;
+  const resumo = group.items.map((i) => i.type).join(', ');
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, foraDaRede && styles.cardForaDaRede]}>
 
-      {/* Header — date + dealership + total points */}
-      <View style={styles.header}>
+      {/* Header — toca para expandir ou recolher */}
+      <TouchableOpacity
+        style={styles.header}
+        onPress={alternar}
+        activeOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: aberto }}
+        accessibilityLabel={`${formatDate(group.date)}, ${qtd} ${qtd === 1 ? 'serviço' : 'serviços'}`}
+      >
         <View style={styles.headerLeft}>
           <View style={styles.dateRow}>
             <Ionicons name="calendar-outline" size={13} color={Colors.primary} />
             <Text style={styles.dateText}>{formatDate(group.date)}</Text>
           </View>
+          {group.vehicleLabel ? (
+            <View style={styles.veiculoRow}>
+              <Ionicons name="car-outline" size={12} color={Colors.textSecondary} />
+              <Text style={styles.veiculoText} numberOfLines={1}>{group.vehicleLabel}</Text>
+            </View>
+          ) : null}
+
           {group.dealership ? (
             <View style={styles.dealerRow}>
-              <Ionicons name="storefront-outline" size={12} color={Colors.textSecondary} />
+              <Ionicons
+                name={foraDaRede ? 'build-outline' : 'storefront-outline'}
+                size={12}
+                color={Colors.textSecondary}
+              />
               <Text style={styles.dealerText} numberOfLines={1}>{group.dealership}</Text>
             </View>
           ) : null}
+
+          {/* Recolhido: uma linha resume o que foi feito na visita */}
+          {!aberto && (
+            <Text style={styles.resumo} numberOfLines={1}>
+              {qtd} {qtd === 1 ? 'serviço' : 'serviços'} · {resumo}
+            </Text>
+          )}
         </View>
 
-        <View style={styles.pointsBadge}>
-          <Text style={styles.pointsValue}>+{group.totalPoints}</Text>
-          <Text style={styles.pointsLabel}>pts</Text>
+        <View style={styles.headerRight}>
+          {foraDaRede ? (
+            <View style={styles.foraBadge}>
+              <Text style={styles.foraBadgeText}>fora da rede</Text>
+            </View>
+          ) : (
+            <View style={styles.pointsBadge}>
+              <Text style={styles.pointsValue}>+{group.totalPoints}</Text>
+              <Text style={styles.pointsLabel}>pts</Text>
+            </View>
+          )}
+          <Ionicons
+            name={aberto ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={Colors.textSecondary}
+          />
         </View>
-      </View>
+      </TouchableOpacity>
 
+      {!aberto ? null : (
+      <>
       {/* Divider */}
       <View style={styles.divider} />
 
@@ -60,24 +119,31 @@ export function HistoricoItem({ group }: Props) {
           key={item.id}
           style={[styles.serviceRow, i < group.items.length - 1 && styles.serviceRowBorder]}
         >
-          <View style={styles.serviceIconWrap}>
+          <View style={[styles.serviceIconWrap, { backgroundColor: `${CATEGORIAS[categoriaDoServico(item.type)].cor}14` }]}>
             <Ionicons
-              name={SERVICE_ICONS[item.type] ?? 'build-outline'}
+              name={CATEGORIAS[categoriaDoServico(item.type)].icone}
               size={16}
-              color={Colors.primary}
+              color={CATEGORIAS[categoriaDoServico(item.type)].cor}
             />
           </View>
           <View style={styles.serviceInfo}>
             <Text style={styles.serviceType}>{item.type}</Text>
-            {item.km > 0 && (
-              <Text style={styles.serviceMeta}>{item.km.toLocaleString('pt-BR')} km</Text>
-            )}
+            <View style={styles.serviceMetaRow}>
+              <Text style={[styles.categoriaTag, { color: CATEGORIAS[categoriaDoServico(item.type)].cor }]}>
+                {CATEGORIAS[categoriaDoServico(item.type)].label}
+              </Text>
+              {item.km > 0 && (
+                <Text style={styles.serviceMeta}>· {item.km.toLocaleString('pt-BR')} km</Text>
+              )}
+            </View>
           </View>
           <View style={styles.servicePoints}>
             <Text style={styles.servicePointsText}>+{item.pointsEarned} pts</Text>
           </View>
         </View>
       ))}
+      </>
+      )}
 
     </View>
   );
@@ -85,14 +151,27 @@ export function HistoricoItem({ group }: Props) {
 
 // ─── Group helper ─────────────────────────────────────────────────────────────
 
-export function groupMaintenances(maintenances: Maintenance[]): MaintenanceGroup[] {
+/**
+ * Agrupa manutenções por VISITA: mesmo dia, mesma unidade e mesmo veículo.
+ *
+ * O veículo entra na chave de propósito — sem ele, dois carros atendidos no
+ * mesmo dia e na mesma concessionária virariam um card só, misturando históricos.
+ *
+ * @param resolveVeiculo opcional; quando ausente, o agrupamento ignora o veículo
+ *        (é o caso do Passaporte, que já trata de um chassi só).
+ */
+export function groupMaintenances(
+  maintenances: Maintenance[],
+  resolveVeiculo?: (m: Maintenance) => string | undefined,
+): MaintenanceGroup[] {
   const map = new Map<string, MaintenanceGroup>();
 
   for (const m of maintenances) {
     const day = m.date.toISOString().slice(0, 10);
-    const key = `${day}__${m.dealership}`;
+    const vehicleLabel = resolveVeiculo?.(m);
+    const key = `${day}__${m.dealership}__${vehicleLabel ?? ''}`;
     if (!map.has(key)) {
-      map.set(key, { date: m.date, dealership: m.dealership, items: [], totalPoints: 0 });
+      map.set(key, { date: m.date, dealership: m.dealership, vehicleLabel, items: [], totalPoints: 0 });
     }
     const group = map.get(key)!;
     group.items.push(m);
@@ -105,8 +184,41 @@ export function groupMaintenances(maintenances: Maintenance[]): MaintenanceGroup
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  veiculoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  veiculoText: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  resumo: {
+    fontFamily: FontFamily.body,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  serviceMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  categoriaTag: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: 11,
+  },
+  cardForaDaRede: {
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.inactive,
+  },
+  foraBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: Colors.surfaceNeutral,
+  },
+  foraBadgeText: {
+    fontFamily: FontFamily.bodyMedium,
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -175,7 +287,7 @@ const styles = StyleSheet.create({
 
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E8ECF2',
+    backgroundColor: Colors.surfaceMuted,
     marginHorizontal: Spacing.md,
   },
 
@@ -189,7 +301,7 @@ const styles = StyleSheet.create({
   },
   serviceRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F2F5',
+    borderBottomColor: Colors.background,
   },
   serviceIconWrap: {
     width: 34,

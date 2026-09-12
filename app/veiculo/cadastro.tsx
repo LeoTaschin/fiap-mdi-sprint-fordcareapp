@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/Button';
 import { Colors, FontFamily, Spacing } from '@/constants/theme';
 import { FORD_MODELS, COLOR_HEX, COLOR_LABELS, getCarImage, CarColor } from '@/constants/fordModels';
 import { salvarVeiculo } from '@/services/vehicle';
+import { logDevError, safeErrorMessage } from '@/utils/safeError';
+import { analisarVin, normalizarVin } from '@/utils/vin';
 import { supabase } from '@/services/supabase';
 import { useUser } from '@/contexts/UserContext';
 
@@ -26,6 +28,7 @@ export default function VeiculoCadastroScreen() {
   const isAddFlow = back === 'true';
   const { user, dispatch } = useUser();
   const [model, setModel] = useState('');
+  const [vin, setVin] = useState('');
   const [color, setColor] = useState<CarColor>('black');
   const [year, setYear] = useState('');
   const [currentKm, setCurrentKm] = useState('');
@@ -34,6 +37,7 @@ export default function VeiculoCadastroScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const vinRef = useRef<TextInput>(null);
   const yearRef = useRef<TextInput>(null);
   const kmRef = useRef<TextInput>(null);
   const lastKmRef = useRef<TextInput>(null);
@@ -49,6 +53,27 @@ export default function VeiculoCadastroScreen() {
       setColor(config.colors[0]);
     }
     setErrors((p) => ({ ...p, model: '' }));
+  }
+
+  // Análise do chassi em tempo real: é offline e determinística.
+  const vinInfo = useMemo(() => (vin.length === 17 ? analisarVin(vin) : null), [vin]);
+
+  // Ano-modelo do chassi versus ano digitado: divergência acima de 1 ano é suspeita.
+  const anoDivergente = useMemo(() => {
+    if (!vinInfo?.valido || !vinInfo.anoModelo || !year.trim()) return false;
+    return Math.abs(vinInfo.anoModelo - Number(year)) > 1;
+  }, [vinInfo, year]);
+
+  function handleVinChange(texto: string) {
+    const limpo = normalizarVin(texto).slice(0, 17);
+    setVin(limpo);
+    setErrors((p) => ({ ...p, vin: '' }));
+
+    // Se o chassi revela o ano-modelo e o campo ainda está vazio, preenche.
+    if (limpo.length === 17) {
+      const info = analisarVin(limpo);
+      if (info.valido && info.anoModelo && !year.trim()) setYear(String(info.anoModelo));
+    }
   }
 
   function formatDateInput(text: string) {
@@ -70,6 +95,8 @@ export default function VeiculoCadastroScreen() {
   function validate() {
     const e: Record<string, string> = {};
     if (!model) e.model = 'Selecione o modelo';
+    const vinCheck = analisarVin(vin);
+    if (!vinCheck.valido) e.vin = vinCheck.erro ?? 'Chassi inválido';
     if (!year.trim() || isNaN(Number(year))) e.year = 'Ano inválido';
     if (!currentKm.trim() || isNaN(Number(currentKm))) e.currentKm = 'KM inválido';
     if (!lastServiceKm.trim() || isNaN(Number(lastServiceKm))) e.lastServiceKm = 'KM inválido';
@@ -92,6 +119,7 @@ export default function VeiculoCadastroScreen() {
     try {
       const vehicleId = await salvarVeiculo(userId, {
         brand: 'Ford',
+        vin: normalizarVin(vin),
         model,
         color,
         year: parseInt(year),
@@ -104,6 +132,7 @@ export default function VeiculoCadastroScreen() {
         payload: {
           id: vehicleId,
           brand: 'Ford',
+          vin: normalizarVin(vin),
           model,
           color,
           year: parseInt(year),
@@ -117,8 +146,9 @@ export default function VeiculoCadastroScreen() {
       } else {
         router.replace('/(tabs)/home');
       }
-    } catch {
-      setErrors({ general: 'Erro ao salvar. Tente novamente.' });
+    } catch (err) {
+      logDevError('salvarVeiculo', err);
+      setErrors({ general: safeErrorMessage(err, 'Erro ao salvar. Tente novamente.') });
     } finally {
       setLoading(false);
     }
@@ -202,6 +232,41 @@ export default function VeiculoCadastroScreen() {
           {/* Campos numéricos */}
           <View style={styles.form}>
             <Input
+              ref={vinRef}
+              label="Chassi (VIN)"
+              placeholder="17 caracteres — ex: 9BFZH54P8M8123456"
+              value={vin}
+              onChangeText={handleVinChange}
+              error={errors.vin}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={17}
+              returnKeyType="next"
+              onSubmitEditing={() => yearRef.current?.focus()}
+            />
+            {vinInfo?.valido ? (
+              <>
+                <Text style={styles.vinHint}>
+                  {[vinInfo.fabricante, vinInfo.paisOrigem, vinInfo.anoModelo && `ano-modelo ${vinInfo.anoModelo}`]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  {vinInfo.aviso ? ` — ${vinInfo.aviso}` : ''}
+                </Text>
+                {anoDivergente && (
+                  <Text style={styles.vinAviso}>
+                    O chassi indica {vinInfo.anoModelo}, mas você informou {year}. Confira — pode ser
+                    um dígito trocado.
+                  </Text>
+                )}
+              </>
+            ) : (
+              <Text style={styles.vinHelp}>
+                Está no documento do veículo (CRLV) e no vidro dianteiro. É ele que mantém o
+                histórico do carro mesmo se você vendê-lo.
+              </Text>
+            )}
+
+            <Input
               ref={yearRef}
               label="Ano do veículo"
               placeholder="Ex: 2022"
@@ -263,6 +328,29 @@ export default function VeiculoCadastroScreen() {
 }
 
 const styles = StyleSheet.create({
+  vinHint: {
+    fontFamily: FontFamily.bodyMedium,
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  vinAviso: {
+    fontFamily: FontFamily.body,
+    fontSize: 12,
+    color: Colors.warningText,
+    marginTop: -6,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  vinHelp: {
+    fontFamily: FontFamily.body,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: -8,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
   container: { flex: 1, backgroundColor: Colors.background },
   flex: { flex: 1 },
   scroll: {
@@ -284,7 +372,7 @@ const styles = StyleSheet.create({
   },
   previewCard: {
     height: 180,
-    backgroundColor: '#F4F6FA',
+    backgroundColor: Colors.background,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -313,9 +401,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: '#D0D5E0',
+    borderColor: Colors.borderStrong,
     marginRight: Spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
   },
   chipActive: {
     borderColor: Colors.primary,
@@ -327,7 +415,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   colorRow: {
     flexDirection: 'row',

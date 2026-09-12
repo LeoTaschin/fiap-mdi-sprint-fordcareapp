@@ -1,242 +1,255 @@
-# FordCare 🚗
+# FordCare
 
-> **Seu Ford. Sempre em dia.**  
-> Solução mobile para retenção de clientes no pós-venda da rede oficial Ford.
-
----
-
-## 📋 Sobre o Projeto
-
-### Desafio Ford Escolhido
-**Desafio 02 — Impulsionando o VIN Share na América do Sul**
-
-O VIN Share representa a porcentagem de veículos Ford que utilizam a rede oficial de concessionárias para manutenções. O desafio é reduzir a evasão de clientes para mecânicas não autorizadas, aumentando a fidelização no pós-venda.
-
-### Por que uma solução mobile?
-Clientes evitam a rede oficial por falta de visibilidade sobre o estado do veículo, dificuldade em encontrar concessionárias e ausência de incentivos concretos para permanecer na rede. O FordCare resolve esses três pontos diretamente no celular do proprietário, com alertas inteligentes, agendamento facilitado e um programa de pontos que recompensa a fidelidade.
+> **O histórico de manutenção pertence ao carro, não ao dono.**
+> Aplicativo mobile para o Desafio 02 da Ford — Impulsionando o VIN Share na América do Sul.
 
 ---
 
-## ✅ Funcionalidades Implementadas
+## O problema
 
-### Autenticação
-- Cadastro de conta com validação de campos
-- Login com e-mail e senha via Supabase Auth
-- Persistência de sessão com AsyncStorage
+O **VIN Share** mede a porcentagem de veículos Ford que usam a rede oficial para manutenção. É o indicador que a Ford acompanha porque cliente retido no pós-venda compra de novo: segundo a pesquisa da NADA citada pela Ford, **83% dos clientes com boa experiência em serviços comprariam outro veículo da mesma marca** — e **80% trocam de concessionária se puderem ter melhor experiência**.
 
-### Gestão de Veículos
-- Cadastro de múltiplos veículos Ford (Bronco, Fusion, Maverick, Ranger, Territory)
-- Swiper de veículos na Home com fotos reais por modelo e cor
-- Atualização de quilometragem com validação
+Existe um vazamento nesse funil que quase ninguém trata: **a troca de dono**. Quando um Ford é revendido, o VIN continua no parque circulante e a Ford continua contando aquele carro no denominador do indicador. Mas o histórico de manutenção morre junto com a conta do dono anterior. O comprador entra como lead frio, sem relação com nenhuma concessionária, e vai para a oficina mais barata.
 
-### Alertas Inteligentes
-- Cálculo automático de alertas por **tipo de serviço** (não global)
-  - Troca de Óleo: a cada 10.000 km / 6 meses
-  - Revisão Geral: a cada 20.000 km / 12 meses
-  - Rodízio de Pneus: a cada 10.000 km / 6 meses
-  - Filtro de Ar: a cada 15.000 km / 9 meses
-- Status: `urgente` (vencido) · `atencao` (menos de 1.500 km ou 30 dias) · `ok`
-- Alertas individuais — confirmar 3 de 4 serviços resolve apenas esses 3
+O Brasil vende mais seminovo do que zero-quilômetro. Esse é o maior ralo do funil, e ele é invisível para qualquer app que guarde o histórico embaixo do usuário.
 
-### Agendamento
-- Lista de concessionárias Ford reais do estado de SP com horários
-- Indicador de aberto/fechado em tempo real
-- Fluxo de agendamento em 3 etapas: veículo → concessionária → revisão
-- Histórico de agendamentos com filtros (Todos / Agendado / Concluído)
-- Confirmação de revisão que atualiza status do veículo e registra manutenção
+## A solução
 
-### Histórico de Manutenções
-- Agrupamento por sessão de revisão (data + concessionária)
-- Cada grupo exibe todos os serviços realizados com pontos individuais
+O FordCare ancora o histórico no **chassi (VIN)**, não na conta. Isso muda três coisas:
 
-### Programa de Pontos FordCare
-- Pontos ganhos por serviço registrado na rede oficial
-- Níveis: Bronze (0–499 pts) → Prata (500–1.499 pts) → Ouro (1.500+ pts)
-- Barra de progresso para o próximo nível
-- Resgate de benefícios: desconto, lavagem gratuita, revisão gratuita
+1. **O dono atual ganha um motivo egoísta para não fugir da rede.** Carro com histórico completo e rastreável na rede oficial vale mais na revenda — cada serviço registrado é patrimônio que ele constrói.
+2. **O comprador entra no app com um veículo já conhecido**, com histórico e com a próxima revisão calculada, em vez de ser um lead frio.
+3. **A Ford passa a enxergar o denominador real.** O app deixa o cliente registrar também o que fez fora da rede — é esse dado que transforma VIN Share de estimativa em medida.
 
-### Perfil
-- Avatar com iniciais do usuário
-- Saldo de pontos e nível atual
-- Como ganhar pontos
-- Benefícios disponíveis para resgate
-- Configurações da conta
+> O VIN Share de hoje financia o VIN Share do próximo dono.
 
 ---
 
-## 👥 Integrantes do Grupo
+## Funcionalidades
+
+### Passaporte do Veículo
+Histórico lido pelo chassi, com validação offline do VIN segundo a ISO 3779: 17 caracteres, ausência de I/O/Q, identificação do fabricante pelo WMI e decodificação do ano-modelo. O dígito verificador é conferido como **aviso**, nunca bloqueio — ele é obrigatório no mercado norte-americano, não no Brasil, e reprovar por ele rejeitaria chassis brasileiros legítimos.
+
+A tela mostra o selo de continuidade (serviços, anos de histórico, **percentual real** na rede oficial) e uma linha do tempo que distingue visualmente o que passou pela Ford do que não passou. O passaporte pode ser compartilhado com o comprador na hora da venda.
+
+### Copiloto
+Recomendação priorizada na Home, em três camadas:
+
+- **Sinais** — km/mês estimado a partir do histórico, idade do veículo, alertas vencidos e a vencer, tempo desde o último serviço na rede.
+- **Priorização** — heurística explicável, sem caixa-preta, que ordena o que resolver primeiro.
+- **Texto** — a frase mostra o *porquê* com números reais: *"Está vencida há 1.200 km. Você roda cerca de 850 km por mês."*
+
+O CTA abre o agendamento com os serviços já pré-selecionados. Os números nunca saem de um modelo generativo — vêm da camada de sinais.
+
+### Lembretes proativos
+O app agenda notificação local para o alerta que está prestes a vencer, com data calculada pelo ritmo de uso real do veículo, não por prazo fixo. É o *lead de serviço proativo* do desafio, entregue no celular do cliente sem custo de infraestrutura.
+
+### Registro de serviço fora da rede
+Fluxo em três etapas (veículo → serviços → revisão), igual ao de agendamento. Parece contraintuitivo deixar o cliente registrar o que fez na oficina do bairro — e é exatamente por isso que funciona: sem esse dado, o app só enxerga o numerador. Esses registros não pontuam e entram marcados no histórico.
+
+### Alertas por tipo de serviço
+Quatro regras (óleo, revisão geral, rodízio de pneus, filtro de ar), cada uma com intervalo próprio em km e em dias. Resolver três de quatro serviços resolve só esses três. Os alertas são calculados **por veículo**, a partir do chassi.
+
+### Programa de pontos
+Serviços na rede oficial geram pontos. Níveis Bronze, Prata e Ouro derivam dos **pontos acumulados na vida toda** (`lifetime_points`), separados do saldo gasto em resgates — sem essa separação, resgatar um benefício rebaixaria o cliente de nível, o oposto do que um programa de fidelidade deve fazer.
+
+---
+
+## Telas
+
+Capturas da build atual, em viewport de 390 x 844 (iPhone 14/15) com densidade 2x. As 22 telas do app estão aqui — nenhuma rota ficou de fora.
+
+### Onboarding — a ideia antes do login
+
+| O problema | A solução | O ganho |
+|:---:|:---:|:---:|
+| ![](assets/screenshots/01-onboarding-problema.png) | ![](assets/screenshots/02-onboarding-solucao.png) | ![](assets/screenshots/03-onboarding-ganho.png) |
+
+### Entrada na conta
+
+| Boas-vindas | Login | Cadastro |
+|:---:|:---:|:---:|
+| ![](assets/screenshots/17-boas-vindas.png) | ![](assets/screenshots/18-login.png) | ![](assets/screenshots/19-cadastro-conta.png) |
+
+### Home e Copiloto
+
+| Veículo e status | Recomendação priorizada |
+|:---:|:---:|
+| ![](assets/screenshots/04-home.png) | ![](assets/screenshots/05-home-copiloto.png) |
+
+### Manutenção — pendências e histórico
+
+| Pendências | Histórico com categorias e filtros |
+|:---:|:---:|
+| ![](assets/screenshots/06-manutencao.png) | ![](assets/screenshots/07-manutencao-historico.png) |
+
+### Passaporte do Veículo
+
+| Histórico ancorado no chassi |
+|:---:|
+| ![](assets/screenshots/11-passaporte.png) |
+
+### Agendamento — lista e detalhe
+
+| Meus agendamentos | Detalhe do agendamento |
+|:---:|:---:|
+| ![](assets/screenshots/08-agendamentos.png) | ![](assets/screenshots/22-agendamento-detalhe.png) |
+
+### Agendamento — o fluxo em três etapas
+
+| 1 · Veículo | 2 · Serviços e concessionária | 3 · Revisão |
+|:---:|:---:|:---:|
+| ![](assets/screenshots/12-agendar-veiculo.png) | ![](assets/screenshots/13-agendar-servicos.png) | ![](assets/screenshots/20-agendar-revisao.png) |
+
+### Serviço fora da rede — o mesmo fluxo em três etapas
+
+| 1 · Veículo | 2 · O que foi feito | 3 · Revisão |
+|:---:|:---:|:---:|
+| ![](assets/screenshots/14-externo-veiculo.png) | ![](assets/screenshots/15-externo-servicos.png) | ![](assets/screenshots/21-externo-revisao.png) |
+
+### Perfil e cadastro de veículo
+
+| Pontos e impacto | Benefícios | Cadastro com VIN |
+|:---:|:---:|:---:|
+| ![](assets/screenshots/09-perfil.png) | ![](assets/screenshots/10-perfil-beneficios.png) | ![](assets/screenshots/16-cadastro-veiculo.png) |
+
+---
+
+## Como rodar
+
+```bash
+npm install
+cp .env.example .env      # preencha com as chaves do Supabase
+npx expo start
+```
+
+No Supabase, execute uma vez o arquivo **`supabase/000_sprint3_completo.sql`** no SQL Editor. Ele reúne todas as migrações na ordem correta, é idempotente, e a última query devolve uma linha de conferência — as cinco colunas devem voltar com `1`.
+
+### Build do APK
+
+```bash
+npx eas login
+npx eas init                                  # grava o projectId no app.json
+npx eas build -p android --profile preview    # APK instalável
+```
+
+O perfil `preview` do `eas.json` já está configurado para gerar `.apk` em vez de `.aab`.
+
+⚠️ Antes de buildar, publique as variáveis de ambiente no EAS com `npx eas env:create`. O `.env` está no `.gitignore` e **não** sobe para o servidor de build — sem esse passo o APK é gerado, instala e abre, mas nenhuma chamada ao Supabase funciona.
+
+O passo a passo completo, com o roteiro de verificação de todos os fluxos no aparelho, está em [`docs/entrega-final.md`](docs/entrega-final.md).
+
+---
+
+## Arquitetura
+
+| Camada | Escolha | Por quê |
+|---|---|---|
+| Framework | React Native 0.74 + Expo SDK 51 | Stack da disciplina, entrega nativa Android/iOS |
+| Navegação | Expo Router (file-based) | Rotas declarativas e deep links |
+| Estado global | Context API + `useReducer` | Complexidade não justifica dependência externa |
+| Backend | Supabase (PostgreSQL + Auth + RLS) | Row Level Security por usuário, SDK TypeScript |
+| Token de sessão | `expo-secure-store` | Keychain no iOS, EncryptedSharedPreferences no Android |
+| Cache local | AsyncStorage | Sessão e dados do usuário offline |
+| Notificações | `expo-notifications` | Lembretes locais, sem servidor de push |
+| Tipagem | TypeScript | 100% dos arquivos, `tsc --noEmit` limpo |
+
+### Estrutura
+
+```
+app/                    telas (Expo Router)
+  (tabs)/               Home, Manutenção, Agendamentos, Perfil
+  agendamento/          fluxo de agendamento (novo, detalhe)
+  servico/externo       registro de serviço fora da rede
+  veiculo/              cadastro e passaporte
+  auth/                 onboarding, login, cadastro
+components/             componentes reutilizáveis
+constants/              tokens de design, regras, categorias, concessionárias
+contexts/               UserContext (perfil, veículos, manutenções)
+hooks/                  useAlerts, useProactiveReminders
+services/               Supabase: auth, vehicle, maintenance, agendamentos, benefits, auditLog
+supabase/               migrações SQL
+utils/                  lógica pura: vin, alerts, copiloto, formatação
+__tests__/              suíte Jest das funções puras
+docs/                   backlog, roteiro de entrega e Cybersecurity
+```
+
+### Decisões que valem explicação
+
+**Lógica de negócio fora do React.** `utils/vin.ts`, `utils/alerts.ts` e `utils/copiloto.ts` não importam React nem React Native. São funções puras e determinísticas, e por isso testáveis sem mock, sem renderizar componente e sem rede.
+
+**O histórico é do chassi.** `maintenances` carrega `vin`, e os alertas de um veículo são calculados só com o histórico dele. Ao ordenar o último serviço de cada tipo, o desempate é pelo maior KM — o odômetro só anda para frente, então dois serviços do mesmo dia se resolvem pela quilometragem.
+
+**Erros sanitizados para o usuário, brutos para o desenvolvedor.** `utils/safeError.ts` traduz falhas em mensagens seguras (nunca expõe tabela, política RLS ou stack) e o `logDevError` imprime o erro real apenas em `__DEV__`.
+
+**Nenhuma chamada de rede sem limite.** Operações de escrita têm timeout, para que uma promessa pendurada vire erro visível em vez de botão girando para sempre.
+
+**Tokens de design, não hex soltos.** Toda cor sai de `constants/theme.ts`.
+
+---
+
+## Testes
+
+Jest com o preset `jest-expo`. Toda a lógica de negócio vive em funções puras, então
+a suíte roda sem mock, sem renderizar componente e sem rede.
+
+```bash
+npm test              # 101 testes
+npm run test:coverage # relatório de cobertura
+npm run typecheck     # tsc --noEmit
+```
+
+| Arquivo | Cobre |
+|---|---|
+| `__tests__/vin.test.ts` | dígito verificador contra VIN de referência público, ano-modelo no ciclo de 30 anos, letras proibidas (I, O, Q), WMI desconhecido, mascaramento |
+| `__tests__/alerts.test.ts` | escopo do histórico por veículo, desempate por quilometragem no mesmo dia, serviço fora da rede zerando o alerta, frases de vencimento |
+| `__tests__/copiloto.test.ts` | estimativa de km/mês com limites de sanidade, priorização e teto de duas recomendações |
+| `__tests__/serviceCategories.test.ts` | classificação por tipo e por palavra-chave em texto livre, insensível a acento e caixa |
+| `__tests__/safeError.test.ts` | garantia de que nome de tabela, política RLS e stack trace nunca chegam à interface |
+| `__tests__/formatters.test.ts` | formatação pt-BR de km e datas, cálculo de dias decorridos e restantes |
+
+Vários testes nasceram de bugs reais encontrados em uso — o desempate por
+quilometragem e a ordenação do `ERROR_MAP` são dois deles.
+
+---
+
+## Segurança e LGPD
+
+- Token de sessão em armazenamento criptografado (`expo-secure-store`)
+- Row Level Security por `user_id` em todas as tabelas
+- Resgate de benefício em função SQL com `FOR UPDATE`, evitando saldo negativo por corrida entre dispositivos
+- Trilha de auditoria com política de escrita apenas (o usuário nunca lê nem edita os próprios logs)
+- Mensagens de erro sanitizadas antes de chegar à interface
+- Permissão de localização usada de fato (ordenação de concessionárias por distância) e opcional — negá-la não quebra nenhum fluxo
+
+Detalhamento em `docs/entrega-cybersecurity.md`.
+
+---
+
+## Escopo desta entrega
+
+O ponto de partida foi o feedback da Ford sobre a V1. Cada crítica virou uma entrega verificável:
+
+| Feedback da Ford | O que foi feito |
+|---|---|
+| *"Contar melhor a ideia do app"* | Onboarding de três telas antes do login, que apresenta o problema, a solução e o ganho — e um README que abre pelo problema de negócio, não pela lista de features |
+| *"Histórico de revisão após troca de dono de veículo"* | Passaporte do Veículo: o histórico é lido pelo chassi, não pela conta, e sobrevive à revenda |
+| *"Sugestão personalizada com uma IA que checa o status do veículo"* | Copiloto: camada de sinais determinística que estima ritmo de uso, prioriza o que venceu e justifica a recomendação com números reais |
+
+**Deliberadamente fora do escopo.** A transferência ativa de propriedade — dono gera um código, comprador herda o histórico — ficou para a Sprint 4. O Passaporte já demonstra a tese central, e preferimos entregar menos coisas funcionando por inteiro a mais coisas pela metade. É a mesma razão pela qual o Copiloto não chama modelo generativo: os números que aparecem na tela precisam ser auditáveis.
+
+**Conhecido e assumido.** Os pontos e os benefícios usam um catálogo fixo em `constants/`; num cenário real viriam da Ford. As concessionárias são uma base estática de unidades reais de São Paulo, com coordenadas — suficiente para a ordenação por distância funcionar de verdade, insuficiente para cobrir o país.
+
+---
+
+## Equipe
 
 | Nome | RM |
-|------|----|
+|---|---|
 | Gustavo Alves | 557876 |
 | Gabriel Dias | 556830 |
 | Gabriel Galerani | 557421 |
 | Pedro Paulo | 554880 |
 | Leonardo Taschin | 554583 |
 
----
-
-## 🚀 Como Rodar o Projeto
-
-### Pré-requisitos
-- [Node.js](https://nodejs.org/) 18+
-- [Expo Go](https://expo.dev/go) instalado no celular (iOS ou Android)
-- Conta no [Expo](https://expo.dev/) (opcional, para build)
-
-### Passo a passo
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/LeoTaschin/fiap-mdi-sprint-fordcareapp.git
-cd fiap-mdi-sprint-fordcareapp
-
-# 2. Instale as dependências
-npm install
-
-# 3. Inicie o servidor de desenvolvimento
-npx expo start --clear
-```
-
-Escaneie o QR Code com o **Expo Go** (Android) ou com a **Câmera** (iOS).
-
-### Variáveis de Ambiente
-Crie um arquivo `.env` na raiz com as chaves do Supabase:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=sua_url_aqui
-EXPO_PUBLIC_SUPABASE_ANON_KEY=sua_chave_aqui
-```
-
-> As chaves de produção serão fornecidas separadamente para avaliação.
-
----
-
-## 📱 Demonstração Visual
-
-### Fluxo Principal
-
-> 🎬 [Assista ao vídeo de demonstração](https://youtu.be/k4LCsOa3wgM)
-
----
-
-### Autenticação
-
-Telas de entrada do app — boas-vindas, login e criação de conta com validação de campos em tempo real.
-
-| Boas-vindas | Login | Cadastro |
-|:-----------:|:-----:|:--------:|
-| ![Boas-vindas](assets/screenshots/auth/WelcomeScreen.png) | ![Login](assets/screenshots/auth/LoginScreen.png) | ![Cadastro](assets/screenshots/auth/RegisterScreen.png) |
-
----
-
-### Home — Painel do Veículo
-
-Visão geral do veículo com swiper de modelos, status de alertas e atalhos rápidos. O card muda de cor conforme a urgência dos alertas.
-
-| Veículo em dia | Alertas ativos | Registrar veículo |
-|:--------------:|:--------------:|:-----------------:|
-| ![Home sem alertas](assets/screenshots/home/HomeCarNoError.png) | ![Home com alertas](assets/screenshots/home/HomeCarrError.png) | ![Registrar carro](assets/screenshots/home/RegistrarCarro.png) |
-
-| Atualizar quilometragem |
-|:-----------------------:|
-| ![Atualizar KM](assets/screenshots/home/AtualizarKM.png) |
-
----
-
-### Manutenções — Alertas e Histórico
-
-Alertas calculados individualmente por tipo de serviço (óleo, revisão, pneus, filtro). O histórico agrupa manutenções por sessão de visita à concessionária.
-
-| Alertas ativos | Sem alertas | Histórico |
-|:--------------:|:-----------:|:---------:|
-| ![Alertas](assets/screenshots/manutencao/ManutencaoAlerta.png) | ![Sem alertas](assets/screenshots/manutencao/manutencaoNoAlert.png) | ![Histórico](assets/screenshots/manutencao/HistoricoAlerta.png) |
-
----
-
-### Agendamento
-
-Fluxo completo de agendamento em 3 etapas: escolha do veículo, seleção da concessionária e revisão dos serviços. Inclui lista de agendamentos com filtros por status.
-
-| Concessionárias | Selecionar veículo | Escolher serviços |
-|:---------------:|:-----------------:|:-----------------:|
-| ![Concessionárias](assets/screenshots/agendamento/Concessionarias.png) | ![Seletor](assets/screenshots/agendamento/AgendarSelector.png) | ![Problemas](assets/screenshots/agendamento/AgendarProblemas.png) |
-
-| Revisão do agendamento | Confirmar | Lista de agendamentos |
-|:----------------------:|:---------:|:---------------------:|
-| ![Revisão](assets/screenshots/agendamento/AgendarReview.png) | ![Confirmar](assets/screenshots/agendamento/ConfirmarAgendamento.png) | ![Agendamentos](assets/screenshots/agendamento/Agendamentos.png) |
-
----
-
-### Perfil — Pontos e Benefícios
-
-Saldo de pontos FordCare, nível do usuário (Bronze / Prata / Ouro), barra de progresso, lista de como ganhar pontos e benefícios disponíveis para resgate.
-
-| Perfil — pontos e nível | Benefícios e configurações |
-|:-----------------------:|:--------------------------:|
-| ![Perfil 1](assets/screenshots/perfil/PerfilScreen1.png) | ![Perfil 2](assets/screenshots/perfil/PerfilScren2.png) |
-
----
-
-## 🏗️ Decisões Técnicas
-
-### Stack
-
-| Camada | Tecnologia | Justificativa |
-|--------|------------|---------------|
-| Framework | React Native + Expo SDK 51 | Stack da disciplina, entrega nativa iOS/Android |
-| Navegação | Expo Router (file-based) | Roteamento declarativo, suporte a deep links |
-| Estado Global | Context API + useReducer | Sem dependência externa, adequado à complexidade do app |
-| Backend / Auth | Supabase (PostgreSQL + Auth) | BaaS com RLS, tempo real e SDK TypeScript |
-| Persistência Local | AsyncStorage | Cache offline de sessão e dados do usuário |
-| Notificações | expo-notifications | Lembretes locais de revisão |
-| Tipagem | TypeScript | Em todos os arquivos do projeto |
-| Fontes | Barlow + Barlow Condensed | Identidade visual próxima à marca Ford |
-
-### Estrutura do Projeto
-
-```
-fordcare/
-├── app/
-│   ├── (tabs)/          # Telas principais (Home, Manutenções, Agendamento, Perfil)
-│   ├── agendamento/     # Fluxo de agendamento (novo + detalhe)
-│   ├── auth/            # Login e cadastro
-│   └── veiculo/         # Cadastro de veículo
-├── components/          # Componentes reutilizáveis
-├── constants/           # Tema, regras de manutenção, concessionárias, modelos Ford
-├── contexts/            # UserContext (perfil, veículos, manutenções)
-├── hooks/               # useAlerts (cálculo de alertas por tipo)
-├── services/            # Supabase: auth, vehicles, maintenance, agendamentos
-└── utils/               # Helpers de formatação e cálculo
-```
-
-### Integrações Externas
-- **Supabase Auth** — autenticação com JWT, Row Level Security por `user_id`
-- **Supabase PostgreSQL** — tabelas: `profiles`, `vehicles`, `maintenances`, `agendamentos`
-- **expo-notifications** — agendamento de lembretes locais
-
-### Decisões de Arquitetura
-
-**Alertas por tipo de serviço**  
-Em vez de um único `lastServiceDate` global, o sistema calcula alertas individualmente por tipo usando o histórico de manutenções. Confirmar um agendamento com 3 de 4 serviços resolve apenas esses 3 alertas — o quarto permanece pendente.
-
-**Agrupamento do histórico**  
-Manutenções são agrupadas por `data + concessionária`, formando uma "sessão de revisão". Uma visita com 4 serviços aparece como 1 card no histórico, não 4.
-
-**Sincronização de status**  
-Após confirmar uma revisão, o app atualiza o Supabase (`status → concluido`), registra as manutenções, soma pontos ao perfil e navega de volta à lista — que re-busca os dados frescos via `useFocusEffect`.
-
----
-
-## 🔮 Próximos Passos
-
-- **Geolocalização real** — usar GPS para ordenar concessionárias por distância
-- **Notificações push** — lembretes automáticos quando uma revisão estiver próxima do vencimento
-- **OCR de quilometragem** — leitura do painel pelo celular para atualização automática do km
-- **Indicação de amigos** — fluxo de convite com pontos para ambos
-- **Dashboard Ford** — painel interno para concessionárias visualizarem agendamentos
-
----
-
-## 🎓 Contexto Acadêmico
-
-Projeto desenvolvido como Sprint avaliativa da disciplina **Mobile Development & IoT** — 3º ano de Engenharia de Software — FIAP, em parceria com a **Ford Brasil**, respondendo ao **Desafio 02: Impulsionando o VIN Share na América do Sul**.
+Projeto da disciplina **Mobile Development and IoT** — 3º ano de Engenharia de Software, FIAP, em parceria com a **Ford Brasil**. Backlog da sprint em `docs/sprint3-backlog.md`.

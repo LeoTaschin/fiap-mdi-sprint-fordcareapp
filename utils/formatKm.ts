@@ -11,7 +11,7 @@
  * @returns String formatada com separador de milhar e sufixo "km"
  */
 export function formatKm(km: number): string {
-  return ${km.toLocaleString('pt-BR')} km;
+  return `${km.toLocaleString('pt-BR')} km`;
 }
 
 /**
@@ -37,5 +37,5 @@ export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   const datePart = d.toLocaleDateString('pt-BR');
   const timePart = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return ${datePart} às ${timePart};
+  return `${datePart} às ${timePart}`;
 }

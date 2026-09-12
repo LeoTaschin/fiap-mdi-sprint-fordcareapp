@@ -64,7 +64,7 @@ export function AgendamentoItem({ item }: Props) {
             <Image source={carImage} style={styles.carPhoto} resizeMode="cover" />
           ) : (
             <View style={styles.photoFallback}>
-              <Ionicons name="car-outline" size={44} color="#C8CEDB" />
+              <Ionicons name="car-outline" size={44} color={Colors.inactive} />
             </View>
           )}
         </View>
@@ -77,9 +77,13 @@ export function AgendamentoItem({ item }: Props) {
   );
 }
 
+/** Altura do card. Comporta o estado selecionado, que ganha a linha "Selecionado".
+    Com 120 o conteudo estourava e o nome do modelo saia cortado. */
+const CARD_ALTURA = 146;
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -91,7 +95,7 @@ const styles = StyleSheet.create({
 
   body: {
     flexDirection: 'row',
-    height: 120,
+    height: CARD_ALTURA,
   },
 
   // Left — info
@@ -162,17 +166,17 @@ const styles = StyleSheet.create({
   // Right — car photo cropped to show only the nose
   photoWrap: {
     width: 110,
-    height: 120,
+    height: CARD_ALTURA,
     overflow: 'hidden',
   },
   carPhoto: {
     width: 260,
-    height: 120,
+    height: CARD_ALTURA,
     marginLeft: -35,
   },
   photoFallback: {
     width: 110,
-    height: 120,
+    height: CARD_ALTURA,
     alignItems: 'center',
     justifyContent: 'center',
   },

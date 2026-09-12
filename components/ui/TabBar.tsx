@@ -77,7 +77,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
               <Ionicons
                 name={tab.icon}
                 size={22}
-                color={isActive ? Colors.primary : '#9AA0B2'}
+                color={isActive ? Colors.primary : Colors.textMuted}
               />
             </TouchableOpacity>
           );
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 40,
     paddingHorizontal: 4,
     paddingVertical: 8,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     left: 4,
     bottom: 8,
     borderRadius: 32,
-    backgroundColor: '#EEF2FA',
+    backgroundColor: Colors.surfaceMuted,
   },
   tab: {
     flex: 1,

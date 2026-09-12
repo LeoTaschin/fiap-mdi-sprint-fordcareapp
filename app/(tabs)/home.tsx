@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '@/contexts/UserContext';
 import { computeAlerts } from '@/hooks/useAlerts';
-import { generateReport } from '@/utils/generateReport';
+import { recomendacaoPrincipal } from '@/utils/copiloto';
 import { atualizarKm } from '@/services/vehicle';
 import { VehicleCard } from '@/components/VehicleCard';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -36,7 +36,13 @@ export default function HomeScreen() {
   const firstName = profile?.name?.split(' ')[0] ?? 'você';
   const currentVehicle = vehicles[currentIndex] ?? null;
   const currentAlerts = computeAlerts(currentVehicle, maintenances);
-  const report = generateReport(currentAlerts);
+  const recomendacao = recomendacaoPrincipal(currentVehicle, maintenances, currentAlerts);
+  const pioreStatus = currentAlerts.some((a) => a.status === 'urgente')
+    ? 'urgente'
+    : currentAlerts.some((a) => a.status === 'atencao')
+    ? 'atencao'
+    : 'ok';
+  const pendentes = currentAlerts.filter((a) => a.status !== 'ok').length;
 
   useEffect(() => {
     if (selectedVehicleIndex > 0 && vehicles.length > 1) {
@@ -86,18 +92,18 @@ export default function HomeScreen() {
   }
 
   const QUICK_ACTIONS = [
-    { icon: 'speedometer-outline' as const, label: 'Atualizar\nKM', onPress: openKmSheet },
-    { icon: 'star-outline'        as const, label: 'Meus\npontos',   onPress: () => router.push('/(tabs)/perfil') },
+    { icon: 'speedometer-outline' as const, label: 'Atualizar\nKM',   onPress: openKmSheet },
+    { icon: 'star-outline'        as const, label: 'Meus\npontos',    onPress: () => router.push('/(tabs)/perfil') },
+    { icon: 'document-text-outline' as const, label: 'Passaporte\ndo veículo', onPress: () => router.push('/veiculo/passaporte') },
   ];
 
   const reportBorderColor =
-    report.overallStatus === 'urgente' ? Colors.danger :
-    report.overallStatus === 'atencao' ? '#F5A623' :
+    pioreStatus === 'urgente' ? Colors.danger :
+    pioreStatus === 'atencao' ? Colors.warning :
     Colors.success;
 
   const reportIconColor = reportBorderColor;
-  const reportIconName =
-    report.overallStatus === 'ok' ? 'checkmark-circle' : 'alert-circle';
+  const reportIconName = pioreStatus === 'ok' ? 'checkmark-circle' : 'sparkles';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -114,7 +120,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.pointsBadge}>
-            <Ionicons name="star" size={14} color="#F5A623" />
+            <Ionicons name="star" size={14} color={Colors.warning} />
             <Text style={styles.pointsText}>{profile?.points ?? 0} pts</Text>
           </View>
         </View>
@@ -149,7 +155,7 @@ export default function HomeScreen() {
                       <VehicleCard
                         vehicle={v}
                         alerts={vehicleAlerts}
-                        onAgendar={() => router.push('/(tabs)/agendamento')}
+                        onAgendar={() => router.push('/agendamento/novo')}
                       />
                     </View>
                   </View>
@@ -165,29 +171,43 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* ── Diagnóstico ─────────────────────────────────────────── */}
+            {/* ── Copiloto ────────────────────────────────────────────── */}
             <View style={[styles.reportCard, { borderLeftColor: reportBorderColor }]}>
               <View style={styles.reportHeader}>
                 <Ionicons name={reportIconName} size={18} color={reportIconColor} />
-                <Text style={styles.reportTitle}>Diagnóstico</Text>
+                <Text style={styles.reportTitle}>Copiloto</Text>
               </View>
-              <Text style={styles.reportSummary}>{report.summary}</Text>
-              {report.highlights.map((h, i) => (
-                <View key={i} style={styles.reportItem}>
-                  <View style={[
-                    styles.reportDot,
-                    { backgroundColor: h.status === 'urgente' ? Colors.danger : '#F5A623' },
-                  ]} />
-                  <Text style={styles.reportItemText}>{h.text}</Text>
-                </View>
-              ))}
-              {report.overallStatus !== 'ok' && (
-                <TouchableOpacity
-                  style={styles.reportCta}
-                  onPress={() => router.push('/(tabs)/agendamento')}
-                >
-                  <Text style={styles.reportCtaText}>Agendar revisão →</Text>
-                </TouchableOpacity>
+
+              {recomendacao ? (
+                <>
+                  <Text style={styles.copilotoTitulo}>{recomendacao.titulo}</Text>
+                  <Text style={styles.reportItemText}>{recomendacao.corpo}</Text>
+
+                  {pendentes > 1 && (
+                    <Text style={styles.copilotoExtra}>
+                      Mais {pendentes - 1} {pendentes - 1 === 1 ? 'item pendente' : 'itens pendentes'} —
+                      dá para resolver na mesma visita.
+                    </Text>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.reportCta}
+                    onPress={() =>
+                      router.push(
+                        `/agendamento/novo?alertType=${encodeURIComponent(recomendacao.alertType)}`,
+                      )
+                    }
+                  >
+                    <Text style={styles.reportCtaText}>
+                      Agendar {recomendacao.alertType.toLowerCase()} →
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={styles.reportSummary}>
+                  Seu {currentVehicle?.model ?? 'Ford'} está em dia. Continue assim — cada serviço na
+                  rede oficial vale pontos e histórico.
+                </Text>
               )}
             </View>
           </>
@@ -261,11 +281,12 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FA' },
+  container: { flex: 1, backgroundColor: Colors.background },
   scroll: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: 100,
+    // A TabBar flutua sobre o conteúdo: sem esta folga o último card fica encoberto.
+    paddingBottom: 140,
   },
 
   // Header
@@ -290,7 +311,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
@@ -327,7 +348,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     shadowColor: '#000',
     shadowOpacity: 0.07,
     shadowRadius: 4,
@@ -360,7 +381,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#C8CEDB',
+    backgroundColor: Colors.inactive,
   },
   dotActive: {
     width: 18,
@@ -369,7 +390,7 @@ const styles = StyleSheet.create({
 
   // Report / Diagnóstico
   reportCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.md,
     marginBottom: Spacing.md,
@@ -415,6 +436,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     flex: 1,
+    lineHeight: 19,
+  },
+  copilotoTitulo: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: 15,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  copilotoExtra: {
+    fontFamily: FontFamily.body,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   reportCta: {
     marginTop: Spacing.sm,
@@ -427,7 +462,7 @@ const styles = StyleSheet.create({
 
   // Empty state
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: Spacing.xl,
     alignItems: 'center',
@@ -475,7 +510,7 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     width: '47%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.md,
     alignItems: 'flex-start',
@@ -489,7 +524,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EEF2FA',
+    backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.sm,

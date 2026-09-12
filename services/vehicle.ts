@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 
 export type VehicleData = {
   brand: 'Ford';
+  vin?: string;
   model: string;
   color: string;
   year: number;
@@ -16,6 +17,7 @@ export async function salvarVeiculo(userId: string, data: VehicleData): Promise<
     .insert({
       user_id: userId,
       brand: data.brand,
+      vin: data.vin ?? null,
       model: data.model,
       color: data.color,
       year: data.year,

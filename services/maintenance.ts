@@ -2,6 +2,9 @@ import { supabase } from './supabase';
 
 export type MaintenanceData = {
   vehicleId?: string;
+  vin?: string;
+  /** Padrão true. false marca serviço feito fora da rede oficial. */
+  inNetwork?: boolean;
   type: string;
   date: Date;
   km: number;
@@ -16,6 +19,8 @@ export async function registrarManutencao(userId: string, data: MaintenanceData)
     .insert({
       user_id: userId,
       vehicle_id: data.vehicleId ?? null,
+      vin: data.vin ?? null,
+      in_network: data.inNetwork ?? true,
       type: data.type,
       date: data.date.toISOString(),
       km: data.km,

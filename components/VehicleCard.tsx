@@ -18,8 +18,8 @@ type Props = {
 
 const STATUS_CONFIG = {
   ok:      { label: 'Veículo em dia',     color: Colors.success, icon: 'checkmark-circle' as const },
-  atencao: { label: 'Atenção necessária', color: '#F5A623',      icon: 'warning'          as const },
-  urgente: { label: 'Revisão urgente',    color: Colors.danger,  icon: 'alert-circle'     as const },
+  atencao: { label: 'Atenção necessária', color: Colors.warning,      icon: 'warning'          as const },
+  urgente: { label: 'Manutenção vencida',  color: Colors.danger,  icon: 'alert-circle'     as const },
 };
 
 // Converte "Troca de Óleo" → "Óleo",  "Rodízio de Pneus" → "Pneus", etc.
@@ -38,7 +38,7 @@ function statColor(alert: Alert): string {
   return alert.status === 'urgente'
     ? Colors.danger
     : alert.status === 'atencao'
-    ? '#F5A623'
+    ? Colors.warning
     : Colors.textPrimary;
 }
 
@@ -52,6 +52,16 @@ export function VehicleCard({ vehicle, alerts, onAgendar }: Props) {
   const urgentAlerts  = alerts.filter((a) => a.status === 'urgente');
   const atencaoAlerts = alerts.filter((a) => a.status === 'atencao');
   const overallStatus = urgentAlerts.length > 0 ? 'urgente' : atencaoAlerts.length > 0 ? 'atencao' : 'ok';
+
+  // Nomear o que está pendente evita o mal-entendido de resolver um item e
+  // continuar vendo o mesmo aviso genérico por causa de outro.
+  const pendentes = urgentAlerts.length > 0 ? urgentAlerts : atencaoAlerts;
+  const rotuloStatus =
+    pendentes.length === 0
+      ? STATUS_CONFIG.ok.label
+      : pendentes.length === 1
+      ? `${shortName(pendentes[0].type)} ${urgentAlerts.length > 0 ? 'vencido' : 'a vencer'}`
+      : `${pendentes.map((a) => shortName(a.type)).slice(0, 2).join(', ')}${pendentes.length > 2 ? ` +${pendentes.length - 2}` : ''}`;
   const status = STATUS_CONFIG[overallStatus];
   const nextAlert = urgentAlerts[0] ?? atencaoAlerts[0] ?? null;
 
@@ -69,7 +79,7 @@ export function VehicleCard({ vehicle, alerts, onAgendar }: Props) {
         {carImage ? (
           <Image source={carImage} style={styles.carImage} resizeMode="contain" />
         ) : (
-          <Ionicons name="car-outline" size={80} color="#C8CEDB" />
+          <Ionicons name="car-outline" size={80} color={Colors.inactive} />
         )}
         {/* Fade para o branco do body do card */}
         <View style={styles.imageFade} pointerEvents="none" />
@@ -93,7 +103,7 @@ export function VehicleCard({ vehicle, alerts, onAgendar }: Props) {
         {/* Badge de status */}
         <View style={[styles.statusBadge, { backgroundColor: status.color + '18' }]}>
           <Ionicons name={status.icon} size={13} color={status.color} />
-          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+          <Text style={[styles.statusText, { color: status.color }]}>{rotuloStatus}</Text>
         </View>
 
         {/* Divisor */}
@@ -156,7 +166,7 @@ export function VehicleCard({ vehicle, alerts, onAgendar }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -169,7 +179,7 @@ const styles = StyleSheet.create({
   // Imagem
   imageArea: {
     height: 190,
-    backgroundColor: '#F0F3FA',
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -221,7 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#F4F6FA',
+    backgroundColor: Colors.background,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
@@ -258,7 +268,7 @@ const styles = StyleSheet.create({
   // Divisor
   divider: {
     height: 1,
-    backgroundColor: '#F0F2F7',
+    backgroundColor: Colors.background,
     marginBottom: Spacing.md,
   },
 
@@ -285,7 +295,7 @@ const styles = StyleSheet.create({
   statSep: {
     width: 1,
     height: 28,
-    backgroundColor: '#E8EAF0',
+    backgroundColor: Colors.surfaceMuted,
   },
 
   // CTA
@@ -301,6 +311,6 @@ const styles = StyleSheet.create({
   agendarText: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

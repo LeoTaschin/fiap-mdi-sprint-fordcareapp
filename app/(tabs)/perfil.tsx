@@ -1,11 +1,16 @@
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { useState, useMemo } from 'react';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useUser } from '@/contexts/UserContext';
 import { Level } from '@/contexts/UserContext';
 import { logout } from '@/services/auth';
-import { Colors, FontFamily, Spacing } from '@/constants/theme';
+import { resgatarBeneficio } from '@/services/benefits';
+import { logAuditEvent } from '@/services/auditLog';
+import { logDevError } from '@/utils/safeError';
+import { Toast } from '@/components/ui/Toast';
+import { Colors, FontFamily, Spacing, LevelColors } from '@/constants/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -21,11 +26,7 @@ const LEVEL_MIN: Record<Level, number> = {
   ouro: 1500,
 };
 
-const LEVEL_COLOR: Record<Level, string> = {
-  bronze: '#CD7F32',
-  prata: '#8A9BB0',
-  ouro: '#F5A623',
-};
+
 
 const LEVEL_LABEL: Record<Level, string> = {
   bronze: 'Bronze',
@@ -34,11 +35,10 @@ const LEVEL_LABEL: Record<Level, string> = {
 };
 
 const HOW_TO_EARN = [
-  { icon: 'construct-outline',  label: 'Revisão Geral',    pts: 200 },
-  { icon: 'water-outline',      label: 'Troca de Óleo',    pts: 100 },
-  { icon: 'disc-outline',       label: 'Rodízio de Pneus', pts: 100 },
-  { icon: 'funnel-outline',     label: 'Filtro de Ar',     pts: 80  },
-  { icon: 'person-add-outline', label: 'Indicar amigo',    pts: 100 },
+  { icon: 'construct-outline', label: 'Revisão Geral',    pts: 200 },
+  { icon: 'water-outline',     label: 'Troca de Óleo',    pts: 100 },
+  { icon: 'disc-outline',      label: 'Rodízio de Pneus', pts: 100 },
+  { icon: 'funnel-outline',    label: 'Filtro de Ar',     pts: 80  },
 ] as const;
 
 const BENEFITS = [
@@ -65,13 +65,32 @@ function progressToNext(points: number, level: Level): number {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PerfilScreen() {
-  const { profile, vehicle } = useUser();
+  const { profile, vehicle, maintenances, dispatch } = useUser();
+  const [resgatando, setResgatando] = useState<string | null>(null);
+  const [toast, setToast] = useState({
+    visible: false,
+    message: '',
+    type: 'success' as 'success' | 'error',
+  });
 
   const level: Level = profile?.level ?? 'bronze';
   const points = profile?.points ?? 0;
   const nextThreshold = LEVEL_NEXT[level];
   const progress = progressToNext(points, level);
-  const levelColor = LEVEL_COLOR[level];
+  const levelColor = LevelColors[level];
+
+  // ── Índice de histórico na rede oficial ─────────────────────────────────
+  // É o mesmo número que a Ford chama de VIN Share, visto do lado do cliente.
+  // Só é honesto porque o app deixa registrar serviço feito FORA da rede.
+  const impacto = useMemo(() => {
+    const doVeiculo = vehicle?.vin
+      ? maintenances.filter((m) => m.vin === vehicle.vin)
+      : maintenances;
+    const total = doVeiculo.length;
+    if (total === 0) return null;
+    const naRede = doVeiculo.filter((m) => m.inNetwork !== false).length;
+    return { total, naRede, pct: Math.round((naRede / total) * 100) };
+  }, [maintenances, vehicle?.vin]);
 
   async function handleLogout() {
     Alert.alert('Sair da conta', 'Tem certeza que deseja sair?', [
@@ -95,7 +114,66 @@ export default function PerfilScreen() {
       );
       return;
     }
-    Alert.alert('Benefício resgatado!', `Apresente na concessionária para usar "${label}".`);
+
+    Alert.alert('Resgatar benefício', `Usar ${cost.toLocaleString('pt-BR')} pts em "${label}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Resgatar',
+        onPress: async () => {
+          if (resgatando) return;
+          setResgatando(label);
+          try {
+            await resgatarBeneficio(label, cost);
+            // O débito acontece no banco; aqui só refletimos o novo saldo.
+            // O nível não muda: é calculado sobre os pontos acumulados na vida toda.
+            dispatch({ type: 'UPDATE_POINTS', payload: { points: points - cost, level } });
+            await logAuditEvent({
+              userId: profile?.uid,
+              action: 'REDEEM_BENEFIT',
+              resource: label,
+              metadata: { cost },
+            });
+            setToast({
+              visible: true,
+              message: `"${label}" resgatado — apresente na concessionária.`,
+              type: 'success',
+            });
+          } catch (e) {
+            logDevError('resgatarBeneficio', e);
+            const code = e instanceof Error ? e.message : 'DESCONHECIDO';
+            setToast({
+              visible: true,
+              message:
+                code === 'SALDO_INSUFICIENTE'
+                  ? 'Seu saldo mudou. Atualize a tela e tente de novo.'
+                  : 'Não foi possível resgatar agora. Tente novamente.',
+              type: 'error',
+            });
+            await logAuditEvent({
+              userId: profile?.uid,
+              action: 'REDEEM_BENEFIT',
+              resource: label,
+              status: 'failure',
+            });
+          } finally {
+            setResgatando(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleConvidar() {
+    const primeiroNome = profile?.name?.split(' ')[0] ?? 'Um amigo';
+    try {
+      await Share.share({
+        message:
+          `${primeiroNome} está usando o FordCare para manter o Ford em dia: alertas de revisão, ` +
+          `histórico completo do veículo e pontos a cada serviço na rede oficial. Baixe você também.`,
+      });
+    } catch {
+      // Usuário fechou a folha de compartilhamento — não é erro.
+    }
   }
 
   return (
@@ -176,14 +254,43 @@ export default function PerfilScreen() {
           )}
         </View>
 
+        {/* ── Impacto: histórico na rede oficial ────────────────────────────── */}
+        {impacto && (
+          <TouchableOpacity
+            style={styles.impactoCard}
+            onPress={() => router.push('/veiculo/passaporte')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.impactoTopo}>
+              <Text style={styles.impactoLabel}>HISTÓRICO NA REDE OFICIAL</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+            </View>
+
+            <View style={styles.impactoLinha}>
+              <Text style={styles.impactoPct}>{impacto.pct}%</Text>
+              <Text style={styles.impactoFracao}>
+                {impacto.naRede} de {impacto.total}{' '}
+                {impacto.total === 1 ? 'serviço' : 'serviços'}
+              </Text>
+            </View>
+
+            <View style={styles.impactoBarra}>
+              <View style={[styles.impactoBarraFill, { width: `${impacto.pct}%` }]} />
+            </View>
+
+            <Text style={styles.impactoTexto}>
+              {impacto.pct === 100
+                ? 'Histórico completo na rede Ford — é isso que sustenta o valor do seu carro na revenda.'
+                : 'Quanto mais serviços na rede oficial, mais o histórico do veículo vale na hora de vender.'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* ── Como ganhar pontos ────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Como ganhar pontos</Text>
         <View style={styles.listCard}>
-          {HOW_TO_EARN.map((item, i) => (
-            <View
-              key={item.label}
-              style={[styles.listRow, i < HOW_TO_EARN.length - 1 && styles.listRowBorder]}
-            >
+          {HOW_TO_EARN.map((item) => (
+            <View key={item.label} style={[styles.listRow, styles.listRowBorder]}>
               <View style={styles.listIconWrap}>
                 <Ionicons name={item.icon} size={18} color={Colors.primary} />
               </View>
@@ -193,6 +300,14 @@ export default function PerfilScreen() {
               </View>
             </View>
           ))}
+
+          <TouchableOpacity style={styles.listRow} onPress={handleConvidar} activeOpacity={0.7}>
+            <View style={styles.listIconWrap}>
+              <Ionicons name="person-add-outline" size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.listLabel}>Convidar um amigo</Text>
+            <Ionicons name="share-outline" size={18} color={Colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Benefícios ────────────────────────────────────────────────────── */}
@@ -204,6 +319,7 @@ export default function PerfilScreen() {
               key={b.label}
               style={[styles.benefitCard, !canRedeem && styles.benefitCardLocked]}
               onPress={() => handleResgate(b.label, b.cost)}
+              disabled={!canRedeem || resgatando !== null}
               activeOpacity={0.8}
             >
               <View style={[styles.benefitIcon, !canRedeem && styles.benefitIconLocked]}>
@@ -220,7 +336,7 @@ export default function PerfilScreen() {
               <Ionicons
                 name={canRedeem ? 'chevron-forward' : 'lock-closed-outline'}
                 size={18}
-                color={canRedeem ? Colors.primary : '#C8CEDB'}
+                color={canRedeem ? Colors.primary : Colors.inactive}
               />
             </TouchableOpacity>
           );
@@ -238,7 +354,7 @@ export default function PerfilScreen() {
               <Ionicons name="car-outline" size={18} color={Colors.primary} />
             </View>
             <Text style={styles.listLabel}>Meu veículo</Text>
-            <Ionicons name="chevron-forward" size={18} color="#C8CEDB" />
+            <Ionicons name="chevron-forward" size={18} color={Colors.inactive} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -255,6 +371,13 @@ export default function PerfilScreen() {
 
         <Text style={styles.versionText}>FordCare · v1.0.0</Text>
       </ScrollView>
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast((t) => ({ ...t, visible: false }))}
+      />
     </View>
   );
 }
@@ -262,10 +385,55 @@ export default function PerfilScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F4F6FA' },
+  impactoCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  impactoTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  impactoLabel: {
+    fontFamily: FontFamily.bodySemiBold,
+    fontSize: 11,
+    color: Colors.textSecondary,
+    letterSpacing: 0.7,
+  },
+  impactoLinha: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  impactoPct: { fontFamily: FontFamily.display, fontSize: 32, color: Colors.primary },
+  impactoFracao: {
+    fontFamily: FontFamily.body,
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  impactoBarra: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.surfaceNeutral,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  impactoBarraFill: { height: 6, borderRadius: 3, backgroundColor: Colors.success },
+  impactoTexto: {
+    fontFamily: FontFamily.body,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  root: { flex: 1, backgroundColor: Colors.background },
 
   // Header
-  safeHeader: { backgroundColor: '#FFFFFF' },
+  safeHeader: { backgroundColor: Colors.surface },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,9 +441,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.lg,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8ECF2',
+    borderBottomColor: Colors.surfaceMuted,
   },
   avatarWrap: {
     width: 52,
@@ -322,7 +490,7 @@ const styles = StyleSheet.create({
   levelBadgeText: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: 12,
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 
   // Scroll
@@ -336,7 +504,7 @@ const styles = StyleSheet.create({
 
   // Points card
   pointsCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.md,
     shadowColor: '#000',
@@ -384,7 +552,7 @@ const styles = StyleSheet.create({
   progressWrap: { gap: 6 },
   progressTrack: {
     height: 6,
-    backgroundColor: '#E8ECF2',
+    backgroundColor: Colors.surfaceMuted,
     borderRadius: 999,
     overflow: 'hidden',
   },
@@ -410,7 +578,7 @@ const styles = StyleSheet.create({
 
   // Generic list card
   listCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -428,7 +596,7 @@ const styles = StyleSheet.create({
   },
   listRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F2F5',
+    borderBottomColor: Colors.background,
   },
   listIconWrap: {
     width: 36,
@@ -468,7 +636,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: Spacing.md,
     shadowColor: '#000',
@@ -490,7 +658,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   benefitIconLocked: {
-    backgroundColor: '#F0F2F5',
+    backgroundColor: Colors.background,
   },
   benefitInfo: { flex: 1, gap: 2 },
   benefitLabel: {
@@ -509,7 +677,7 @@ const styles = StyleSheet.create({
   versionText: {
     fontFamily: FontFamily.body,
     fontSize: 11,
-    color: '#C8CEDB',
+    color: Colors.inactive,
     textAlign: 'center',
     marginTop: Spacing.md,
   },

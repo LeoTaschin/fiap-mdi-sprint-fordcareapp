@@ -8,7 +8,7 @@ type Props = { alert: Alert; onAgendar?: () => void };
 
 const STATUS_COLOR: Record<string, string> = {
   urgente: Colors.danger,
-  atencao: '#F5A623',
+  atencao: Colors.warning,
   ok: Colors.success,
 };
 
@@ -55,7 +55,7 @@ export function AlertCard({ alert, onAgendar }: Props) {
           </Text>
         </View>
         <View style={styles.infoItem}>
-          <Ionicons name="star" size={13} color="#F5A623" />
+          <Ionicons name="star" size={13} color={Colors.warning} />
           <Text style={styles.infoText}>+{alert.points} pts</Text>
         </View>
       </View>
@@ -71,7 +71,7 @@ export function AlertCard({ alert, onAgendar }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.sm,

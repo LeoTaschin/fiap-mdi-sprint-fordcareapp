@@ -20,8 +20,9 @@ O VIN Share representa a porcentagem de veículos Ford que utilizam a rede ofici
 | Navegação | Expo Router (file-based) |
 | Estado global | Context API + useReducer |
 | Persistência local | AsyncStorage |
-| Backend / Auth | Firebase (Firestore + Authentication) |
-| Geolocalização | expo-location + Google Maps API |
+| Backend / Auth | Supabase (PostgreSQL + Auth + Row Level Security) |
+| Token em repouso | expo-secure-store (Keychain / EncryptedSharedPreferences) |
+| Geolocalização | expo-location |
 | Notificações | expo-notifications |
 | Estilização | StyleSheet nativo + Expo Google Fonts |
 | Fontes | Barlow Condensed (display) + Barlow (body) |
@@ -76,58 +77,52 @@ fordcare/
 │       ├── Toast.tsx              → Feedback de sucesso/erro
 │       └── BottomSheet.tsx        → Modal bottom sheet reutilizável
 ├── contexts/
-│   └── VehicleContext.tsx         → Estado global: veículo, alertas, pontos
+│   └── UserContext.tsx            → Estado global: perfil, veículos, manutenções
 ├── services/
-│   ├── firebase.ts                → Config e inicialização do Firebase
+│   ├── supabase.ts                → Client Supabase com SecureStore como storage
 │   ├── auth.ts                    → Login, cadastro, logout
-│   ├── vehicle.ts                 → CRUD do veículo no Firestore
-│   ├── maintenance.ts             → CRUD de manutenções
-│   ├── location.ts                → Geolocalização e busca de concessionárias
+│   ├── vehicle.ts                 → CRUD de veículos
+│   ├── maintenance.ts             → CRUD de manutenções + pontuação
+│   ├── agendamentos.ts            → CRUD de agendamentos
+│   ├── auditLog.ts                → Trilha de auditoria de ações críticas
+│   ├── location.ts                → Geolocalização e concessionárias próximas
 │   └── notifications.ts           → Agendamento de notificações locais
 ├── constants/
 │   ├── maintenanceRules.ts        → Regras de alertas por km e tempo
 │   ├── theme.ts                   → Cores, espaçamentos, tipografia
 │   └── fordDealerships.ts         → Dataset estático de concessionárias Ford SP
 ├── hooks/
-│   ├── useVehicle.ts              → Hook para acessar contexto do veículo
-│   ├── useAlerts.ts               → Hook que computa alertas pendentes
-│   └── useAuth.ts                 → Hook de autenticação Firebase
+│   ├── useAlerts.ts               → Computa alertas por tipo de serviço
+│   ├── useUser.ts                 → Re-export do UserContext
+│   └── useAuth.ts                 → Hook de sessão Supabase
 └── utils/
-    ├── formatKm.ts                → Formata "38540" → "38.540 km"
+    ├── formatKm.ts                → Formata "38540" → "38.540 km" (+ datas)
     ├── formatDate.ts              → Formata datas em pt-BR
+    ├── generateReport.ts          → Texto do card de diagnóstico da Home
+    ├── safeError.ts               → Sanitiza erros antes de exibir
     └── daysSince.ts               → Calcula dias desde uma data
 ```
 
 ---
 
-## Modelo de Dados (Firestore)
+## Modelo de Dados (Supabase / PostgreSQL)
+
+Tabelas relacionais com Row Level Security por `user_id`.
 
 ```
-users/{userId}
-  ├── name: string
-  ├── email: string
-  ├── points: number
-  ├── level: "bronze" | "prata" | "ouro"
-  ├── createdAt: timestamp
-  │
-  └── vehicles/{vehicleId}
-        ├── brand: "Ford"
-        ├── model: string           → "Territory", "Ranger", "Ka"...
-        ├── year: number
-        ├── currentKm: number
-        ├── lastServiceKm: number
-        ├── lastServiceDate: timestamp
-        └── createdAt: timestamp
-
-  └── maintenances/{maintenanceId}
-        ├── type: string            → "Revisão" | "Óleo" | "Pneus" | "Filtro" | "Outro"
-        ├── date: timestamp
-        ├── km: number
-        ├── dealership: string
-        ├── notes: string
-        ├── pointsEarned: number
-        └── createdAt: timestamp
+profiles          id (uuid, = auth.users.id) · name · email · points · level · created_at
+vehicles          id · user_id → profiles · brand · model · color · year
+                  current_km · last_service_km · last_service_date · created_at
+maintenances      id · user_id → profiles · vehicle_id → vehicles · type · date
+                  km · dealership · notes · points_earned · created_at
+agendamentos      id · user_id → profiles · vehicle_id → vehicles · vehicle_model
+                  vehicle_color · vehicle_year · dealership_id · dealership_name
+                  problems (jsonb) · status · created_at
+audit_logs        id · user_id · action · resource · status · metadata (jsonb) · created_at
+                  (política dupla: usuário só insere, nunca lê nem edita)
 ```
+
+Ver `supabase/audit_logs.sql` para o DDL da trilha de auditoria.
 
 ---
 
@@ -256,17 +251,17 @@ Home (tabs)
 
 ---
 
-## Critérios de Avaliação (FIAP)
+## Critérios de Avaliação — Sprint 3 (entrega 27/09)
 
-| Critério | Peso | Como cobrir |
-|---|---|---|
-| Funcionalidade | 25pts | App roda, fluxo completo sem crashes |
-| Qualidade Técnica | 20pts | Context API, Firestore, hooks customizados, boas práticas |
-| Apresentação | 15pts | Vídeo de 3min: problema → demo → arquitetura |
-| Documentação | 15pts | README com prints de todas as telas + GIF do fluxo |
-| UX & Design | 15pts | Identidade Ford, feedback visual, responsivo |
-| Colaboração Git | 5pts | Todos os membros com commits descritivos |
-| Algo a mais | 5pts | expo-notifications com lembrete real de revisão |
+Os quatro objetivos da rubrica de Mobile Development and IoT:
+
+1. Versão final e publicável em **APK**, com todos os fluxos do desafio Ford funcionando **sem erros**
+2. **Identidade visual consolidada** — consistência de componentes, cores, tipografia e UX em todas as telas
+3. Produto finalizado — **código organizado, README completo, demonstração visual de todas as telas**
+4. Build final via **Expo EAS Build**, instalando e executando em dispositivo ou emulador
+
+Não há critério de "inovação" nesta rubrica: a nota vem de terminar bem.
+Backlog detalhado da sprint em `docs/sprint3-backlog.md`.
 
 ---
 
@@ -285,12 +280,12 @@ Home (tabs)
 Ao receber tarefas de desenvolvimento deste projeto, considere sempre:
 
 1. **Expo Router** para navegação — não use React Navigation diretamente
-2. **Firebase Auth** para autenticação — não implemente auth manual
+2. **Supabase Auth** para autenticação — não implemente auth manual
 3. **Context API** para estado global — não use Redux ou Zustand
-4. **AsyncStorage** para cache local — complementar ao Firestore
+4. **AsyncStorage** para cache local; **expo-secure-store** para o token de sessão
 5. **expo-notifications** para lembretes — configure no app.json
 6. **TypeScript** em todos os arquivos
-7. Mantenha a identidade visual Ford: azul `#003478` como cor primária
+7. Identidade visual Ford: use sempre os tokens de `constants/theme.ts` (primária `#133A7C`) — nunca cores hardcoded
 8. Todos os textos em **português brasileiro**
 9. Feedbacks visuais obrigatórios em operações assíncronas (loading, erro, sucesso)
 10. Componentes reutilizáveis em `/components` — evite duplicação de código

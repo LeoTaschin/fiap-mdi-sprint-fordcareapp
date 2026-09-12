@@ -37,8 +37,8 @@ export function AgendamentoCarCard({ vehicle, isSelected, onPress }: Props) {
     if (atencao > 0) {
       return (
         <View style={styles.alertRow}>
-          <View style={[styles.alertDot, { backgroundColor: '#F5A623' }]} />
-          <Text style={[styles.alertText, { color: '#F5A623' }]}>
+          <View style={[styles.alertDot, { backgroundColor: Colors.warning }]} />
+          <Text style={[styles.alertText, { color: Colors.warning }]}>
             {atencao} {atencao === 1 ? 'item requer atenção' : 'itens requerem atenção'}
           </Text>
         </View>
@@ -99,9 +99,13 @@ export function AgendamentoCarCard({ vehicle, isSelected, onPress }: Props) {
   );
 }
 
+/** Altura do card. Comporta o estado selecionado, que ganha a linha "Selecionado".
+    Com 120 o conteudo estourava e o nome do modelo saia cortado. */
+const CARD_ALTURA = 146;
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
 
   body: {
     flexDirection: 'row',
-    height: 120,
+    height: CARD_ALTURA,
   },
 
   // Left info
@@ -188,17 +192,17 @@ const styles = StyleSheet.create({
   // left so only the right portion (nose) is visible
   photoWrap: {
     width: 110,
-    height: 120,
+    height: CARD_ALTURA,
     overflow: 'hidden',
   },
   carPhoto: {
     width: 260,
-    height: 120,
+    height: CARD_ALTURA,
     marginLeft: -35, // hides left 150px of 260px image → shows only the rightmost 110px (nose)
   },
   photoFallback: {
     width: 110,
-    height: 120,
+    height: CARD_ALTURA,
     alignItems: 'center',
     justifyContent: 'center',
   },
