@@ -55,7 +55,7 @@ export function ReviewCarCard({ vehicle }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     overflow: 'hidden',
-    backgroundColor: '#E8ECF2',
+    backgroundColor: Colors.surfaceMuted,
   },
   bannerBrand: {
     fontFamily: FontFamily.display,
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F4F6FA',
+    backgroundColor: Colors.background,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,

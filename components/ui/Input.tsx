@@ -18,10 +18,10 @@ export const Input = forwardRef<TextInput, Props>(function Input(
       <Text style={[styles.label, focused && styles.labelFocused]}>{label}</Text>
       <TextInput
         ref={ref}
-        style={[styles.input, error && styles.inputError]}
+        style={[styles.input, !!error && styles.inputError]}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholderTextColor="#AAAAAA"
+        placeholderTextColor={Colors.textMuted}
         {...props}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}

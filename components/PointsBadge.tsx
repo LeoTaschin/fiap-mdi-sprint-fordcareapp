@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, FontFamily, Spacing } from '@/constants/theme';
+import { Colors, FontFamily, Spacing, LevelColors } from '@/constants/theme';
 
 type Level = 'bronze' | 'prata' | 'ouro';
 
 const LEVEL_COLOR: Record<Level, string> = {
-  bronze: '#CD7F32',
-  prata: '#A8A9AD',
-  ouro: '#FFD700',
+  bronze: LevelColors.bronze,
+  prata: LevelColors.prata,
+  ouro: LevelColors.ouro,
 };
 
 const NEXT_LEVEL_THRESHOLD: Record<Level, number> = {
@@ -50,13 +50,13 @@ const styles = StyleSheet.create({
   levelText: {
     fontFamily: FontFamily.display,
     fontSize: 14,
-    color: '#111111',
+    color: Colors.textPrimary,
     letterSpacing: 1,
   },
   points: {
     fontFamily: FontFamily.display,
     fontSize: 40,
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
   next: {
     fontFamily: FontFamily.body,

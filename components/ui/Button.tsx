@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   outline: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderWidth: 1.5,
     borderColor: Colors.primary,
   },
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bodySemiBold,
     fontSize: 16,
   },
-  primaryLabel: { color: '#FFFFFF' },
+  primaryLabel: { color: Colors.surface },
   outlineLabel: { color: Colors.primary },
   ghostLabel: { color: Colors.primary },
 });

@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
@@ -83,6 +83,6 @@ const styles = StyleSheet.create({
   btnText: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: 13,
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });

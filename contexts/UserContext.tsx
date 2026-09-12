@@ -18,6 +18,8 @@ export type UserProfile = {
 export type Vehicle = {
   id: string;
   brand: 'Ford';
+  /** Chassi — âncora do histórico, sobrevive à troca de dono. */
+  vin?: string;
   model: string;
   color: string;
   year: number;
@@ -28,6 +30,12 @@ export type Vehicle = {
 
 export type Maintenance = {
   id: string;
+  /** Chassi do veículo em que o serviço foi feito. */
+  vin?: string;
+  /** false = serviço declarado pelo cliente fora da rede oficial Ford. */
+  inNetwork: boolean;
+  /** Fallback para registros antigos, anteriores ao VIN. */
+  vehicleId?: string;
   type: string;
   date: Date;
   km: number;
@@ -54,6 +62,7 @@ type Action =
   | { type: 'ADD_VEHICLE'; payload: Vehicle }
   | { type: 'SELECT_VEHICLE'; payload: number }
   | { type: 'SET_VEHICLE'; payload: Vehicle }
+  | { type: 'UPDATE_VEHICLE'; payload: Vehicle }
   | { type: 'SET_MAINTENANCES'; payload: Maintenance[] }
   | { type: 'UPDATE_KM'; payload: number }
   | { type: 'ADD_MAINTENANCE'; payload: Maintenance }
@@ -91,6 +100,14 @@ function reducer(state: State, action: Action): State {
     case 'SELECT_VEHICLE': {
       const idx = Math.max(0, Math.min(action.payload, state.vehicles.length - 1));
       return { ...state, selectedVehicleIndex: idx, vehicle: state.vehicles[idx] ?? null };
+    }
+    // Atualiza pelo ID. O SET_VEHICLE escreve no índice selecionado — se o
+    // usuário registrar serviço num veículo que não é o ativo no swiper, ele
+    // sobrescreveria o carro errado.
+    case 'UPDATE_VEHICLE': {
+      const vehicles = state.vehicles.map((v) => (v.id === action.payload.id ? action.payload : v));
+      const atual = vehicles[state.selectedVehicleIndex] ?? null;
+      return { ...state, vehicles, vehicle: atual };
     }
     case 'SET_VEHICLE': {
       const updated = state.vehicles.map((v, i) => i === state.selectedVehicleIndex ? action.payload : v);
@@ -140,6 +157,7 @@ async function loadUserData(userId: string, dispatch: React.Dispatch<Action>) {
   const mappedVehicles: Vehicle[] = (vehicles ?? []).map((v) => ({
     id: v.id,
     brand: 'Ford' as const,
+    vin: v.vin ?? undefined,
     model: v.model,
     color: v.color,
     year: v.year,
@@ -157,6 +175,9 @@ async function loadUserData(userId: string, dispatch: React.Dispatch<Action>) {
 
   const mappedMaint: Maintenance[] = (maintenances ?? []).map((m) => ({
     id: m.id,
+    vin: m.vin ?? undefined,
+    inNetwork: m.in_network ?? true,
+    vehicleId: m.vehicle_id ?? undefined,
     type: m.type,
     date: new Date(m.date),
     km: m.km,

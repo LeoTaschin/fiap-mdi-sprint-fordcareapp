@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: FontFamily.bodyMedium,
     fontSize: 14,
-    color: '#FFFFFF',
+    color: Colors.surface,
     textAlign: 'center',
   },
 });

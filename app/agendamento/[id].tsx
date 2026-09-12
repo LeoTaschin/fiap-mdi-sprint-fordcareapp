@@ -14,6 +14,7 @@ import { ReviewCarCard } from '@/components/ReviewCarCard';
 import { MAINTENANCE_RULES } from '@/constants/maintenanceRules';
 import { Colors, FontFamily, Spacing } from '@/constants/theme';
 import { logAuditEvent } from '@/services/auditLog';
+import { logDevError } from '@/utils/safeError';
 import { safeErrorMessage } from '@/utils/safeError';
 
 const SERVICE_ICONS: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -69,6 +70,9 @@ export default function AgendamentoDetalhe() {
         const points = rule?.points ?? 50;
         const maintenance = await registrarManutencao(user.id, {
           vehicleId: agendamento.vehicleId,
+          // Ancora o serviço no chassi: é assim que o histórico sobrevive à venda.
+          vin: vehicle?.vin,
+          inNetwork: true,
           type: problemType,
           date: new Date(),
           km: vehicle?.currentKm ?? 0,
@@ -80,6 +84,9 @@ export default function AgendamentoDetalhe() {
           type: 'ADD_MAINTENANCE',
           payload: {
             id: maintenance,
+            vehicleId: agendamento.vehicleId,
+            vin: vehicle?.vin,
+            inNetwork: true,
             type: problemType,
             date: new Date(),
             km: vehicle?.currentKm ?? 0,
@@ -100,7 +107,7 @@ export default function AgendamentoDetalhe() {
         const now = new Date();
         await atualizarServico(vehicle.id, vehicle.currentKm, now);
         dispatch({
-          type: 'SET_VEHICLE',
+          type: 'UPDATE_VEHICLE',
           payload: { ...vehicle, lastServiceKm: vehicle.currentKm, lastServiceDate: now },
         });
       }
@@ -114,8 +121,9 @@ export default function AgendamentoDetalhe() {
       });
 
       setAgendamento((prev) => prev ? { ...prev, status: 'concluido' } : prev);
-      router.navigate({ pathname: '/(tabs)/agendamento', params: { confirmedId: agendamento.id } });
+      router.navigate('/(tabs)/agendamento');
     } catch (err) {
+      logDevError('confirmarRevisao', err);
       await logAuditEvent({ userId: user.id, action: 'CONFIRM_AGENDAMENTO', resource: agendamento.id, status: 'failure' });
       setError(safeErrorMessage(err, 'Erro ao confirmar revisão. Tente novamente.'));
     } finally {
@@ -221,10 +229,10 @@ export default function AgendamentoDetalhe() {
             activeOpacity={0.85}
           >
             {confirming ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={Colors.surface} />
             ) : (
               <>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle-outline" size={20} color={Colors.surface} />
                 <Text style={styles.confirmBtnText}>Confirmar revisão</Text>
               </>
             )}
@@ -236,8 +244,8 @@ export default function AgendamentoDetalhe() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F4F6FA' },
-  safeHeader: { backgroundColor: '#F4F6FA' },
+  root: { flex: 1, backgroundColor: Colors.background },
+  safeHeader: { backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Header
@@ -309,7 +317,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: Spacing.md,
     shadowColor: '#000',
@@ -336,7 +344,7 @@ const styles = StyleSheet.create({
 
   // Problems
   problemList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -352,7 +360,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F2F5',
+    borderBottomColor: Colors.background,
   },
   problemIconWrap: {
     width: 36,
@@ -378,7 +386,7 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-    backgroundColor: '#F4F6FA',
+    backgroundColor: Colors.background,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
@@ -401,6 +409,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontFamily: FontFamily.bodySemiBold,
     fontSize: 16,
-    color: '#FFFFFF',
+    color: Colors.surface,
   },
 });
