@@ -3,6 +3,8 @@
 > **O histórico de manutenção pertence ao carro, não ao dono.**
 > Aplicativo mobile para o Desafio 02 da Ford — Impulsionando o VIN Share na América do Sul.
 
+📦 **[Baixar o APK](COLE_AQUI_O_LINK_DO_APK)** · 🎬 **[Vídeo de demonstração](COLE_AQUI_O_LINK_DO_YOUTUBE)**
+
 ---
 
 ## O problema
@@ -246,9 +248,22 @@ O ponto de partida foi o feedback da Ford sobre a V1. Cada crítica virou uma en
 | *"Histórico de revisão após troca de dono de veículo"* | Passaporte do Veículo: o histórico é lido pelo chassi, não pela conta, e sobrevive à revenda |
 | *"Sugestão personalizada com uma IA que checa o status do veículo"* | Copiloto: camada de sinais determinística que estima ritmo de uso, prioriza o que venceu e justifica a recomendação com números reais |
 
-**Deliberadamente fora do escopo.** A transferência ativa de propriedade — dono gera um código, comprador herda o histórico — ficou para a Sprint 4. O Passaporte já demonstra a tese central, e preferimos entregar menos coisas funcionando por inteiro a mais coisas pela metade. É a mesma razão pela qual o Copiloto não chama modelo generativo: os números que aparecem na tela precisam ser auditáveis.
+**Deliberadamente fora do escopo.** A transferência ativa de propriedade — dono gera um código, comprador herda o histórico — ficou para a Sprint 4. O Passaporte já demonstra a tese central, e preferimos entregar menos coisas funcionando por inteiro a mais coisas pela metade. É a mesma razão pela qual o Copiloto não deixa um modelo generativo decidir nada: os números que aparecem na tela precisam ser auditáveis, e o texto redigido é descartado se citar qualquer valor que a camada de sinais não calculou.
 
 **Conhecido e assumido.** Os pontos e os benefícios usam um catálogo fixo em `constants/`; num cenário real viriam da Ford. As concessionárias são uma base estática de unidades reais de São Paulo, com coordenadas — suficiente para a ordenação por distância funcionar de verdade, insuficiente para cobrir o país.
+
+---
+
+## Próximos passos
+
+Em ordem de impacto no VIN Share. Os dois primeiros entram no pitch da Sprint 4.
+
+1. **Transferência de propriedade.** O dono atual gera um código com validade curta e o comprador herda o histórico técnico do chassi — serviços, datas, km e concessionária — sem nenhum dado pessoal do vendedor. Fecha o ciclo que o Passaporte começou: o comprador de seminovo passa a entrar no app com o carro já conhecido pela rede.
+2. **Row Level Security por VIN.** Hoje o acesso ao histórico é filtrado por `user_id`. O modelo completo separa o dado técnico, que pertence ao chassi, do dado pessoal, que pertence à conta, com pseudonimização entre os dois — é a base de LGPD para a transferência acima.
+3. **Score de evasão com modelo de ML.** A heurística de risco do Copiloto tem os pesos declarados em `constants/` justamente para ser trocada pelo modelo treinado na disciplina de IA, sem mudar o card nem o CTA da Home.
+4. **Quilometragem automática via OBD-II.** Um adaptador Bluetooth lendo o odômetro elimina o passo manual de "Atualizar km", que é onde os alertas perdem precisão. A arquitetura está descrita na entrega de Cybersecurity.
+5. **Dados reais da Ford.** Trocar os catálogos estáticos — concessionárias de São Paulo, benefícios e pontuação — por integração com a rede Ford, cobrindo o país e permitindo que a concessionária confirme o serviço no próprio sistema.
+6. **Painel da concessionária.** A contrapartida do app: a concessionária vê quais veículos da sua região estão com revisão vencida ou registraram serviço fora da rede, e age antes de perder o cliente.
 
 ---
 
