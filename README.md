@@ -3,7 +3,7 @@
 > **O histórico de manutenção pertence ao carro, não ao dono.**
 > Aplicativo mobile para o Desafio 02 da Ford — Impulsionando o VIN Share na América do Sul.
 
-📦 **[Baixar o APK](COLE_AQUI_O_LINK_DO_APK)** · 🎬 **[Vídeo de demonstração](COLE_AQUI_O_LINK_DO_YOUTUBE)**
+📦 **[Baixar o APK](https://drive.google.com/file/d/1SbuRyi3P6XFKQS15r1ers6C5xDf71q3c/view?usp=drive_link)**
 
 ---
 
@@ -274,7 +274,6 @@ Em ordem de impacto no VIN Share. Os dois primeiros entram no pitch da Sprint 4.
 | Gustavo Alves | 557876 |
 | Gabriel Dias | 556830 |
 | Gabriel Galerani | 557421 |
-| Pedro Paulo | 554880 |
 | Leonardo Taschin | 554583 |
 
 Projeto da disciplina **Mobile Development and IoT** — 3º ano de Engenharia de Software, FIAP, em parceria com a **Ford Brasil**. Backlog da sprint em `docs/sprint3-backlog.md`.
