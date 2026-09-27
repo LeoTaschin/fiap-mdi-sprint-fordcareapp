@@ -1,0 +1,125 @@
+name: DevSecOps — FordCare Mobile
+
+# Pipeline de segurança do app FordCare (React Native/Expo + Supabase).
+# Ordem: qualidade -> SAST -> SCA -> segredos -> políticas de banco (RLS) ->
+# Edge Functions -> build EAS. Qualquer gate que falhar bloqueia o merge e o build.
+# Todas as actions estão fixadas por SHA de commit (não por tag mutável),
+# fechando o vetor de supply chain apontado pelo Semgrep no pipeline da API.
+
+on:
+  push:
+    branches: [main, sprint*]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 9 * * 1" # segunda 06:00 BRT — reexecuta SCA/segredos mesmo sem commit
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Typecheck + testes (Jest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npx jest --ci --coverage
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: cobertura
+          path: coverage/
+
+  sast:
+    name: SAST — Semgrep
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep:1.120.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Falha só em severidade ERROR; WARNING/INFO vão para o relatório (SARIF)
+      - run: >
+          semgrep scan --config p/typescript --config p/react --config p/secrets
+          --exclude node_modules --severity ERROR --error
+          --sarif --output semgrep.sarif
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: semgrep
+          path: semgrep.sarif
+
+  sca:
+    name: SCA — npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      # Dependências que vão para o APK: bloqueia HIGH/CRITICAL
+      - run: npm audit --package-lock-only --omit=dev --audit-level=high
+      # Relatório completo (inclui toolchain de build) para triagem
+      - if: always()
+        run: npm audit --package-lock-only --json > npm-audit.json || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: sca
+          path: npm-audit.json
+
+  segredos:
+    name: Secret scanning — Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # histórico completo
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  politicas-banco:
+    name: Policy-as-code — RLS obrigatório
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: bash scripts/check-rls.sh supabase
+
+  edge-functions:
+    name: Edge Functions — deno check/lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - run: deno check supabase/functions/*/index.ts
+      - run: deno lint supabase/functions/
+
+  build:
+    name: Build EAS (APK) — só com todos os gates verdes
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [qualidade, sast, sca, segredos, politicas-banco, edge-functions]
+    runs-on: ubuntu-latest
+    environment: producao # exige aprovação manual no GitHub
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }} # segredo do repositório, nunca no código
+      - run: npm ci --ignore-scripts
+      # EXPO_PUBLIC_* vêm do EAS Environment (eas env:create), não do repositório
+      - run: eas build -p android --profile production --non-interactive --no-wait

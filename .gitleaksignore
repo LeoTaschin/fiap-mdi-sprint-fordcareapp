@@ -1,0 +1,14 @@
+# Achados históricos do Gitleaks triados na Sprint 4 (Cybersecurity).
+# Critério: só entra aqui o que foi analisado e tem justificativa registrada.
+#
+# Supabase anon key (claim role=anon) em commits antigos. É pública por
+# desenho — vai embutida no APK — e o acesso aos dados é protegido por RLS.
+# Removida do .env.example no commit da Sprint 4.
+66b272b08b57544cbb00ce5e77db77e05a467fc8:.env.example:jwt:4
+66344e5e584d76df7261db55fd1e483834104b4e:services/supabase.ts:jwt:6
+3998f2fd6011549aaed9fab2e82d05b470806dab:services/supabase.ts:jwt:7
+#
+# Firebase API key do protótipo inicial (backend migrado para Supabase em
+# 3998f2f). Projeto Firebase `fordcareapp` excluído em 27/09/2026, o que
+# invalida a chave. Triada depois da revogação (runbook IR-02).
+4f5abb9a34f2e11966cd16398ae3f18e31a2958b:services/firebase.ts:gcp-api-key:12
