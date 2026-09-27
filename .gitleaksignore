@@ -9,6 +9,6 @@
 3998f2fd6011549aaed9fab2e82d05b470806dab:services/supabase.ts:jwt:7
 #
 # Firebase API key do protótipo inicial (backend migrado para Supabase em
-# 3998f2f). NÃO ignorada de propósito: o pipeline segue acusando até a chave
-# ser revogada no console do Firebase. Depois disso, descomentar a linha abaixo.
-# 4f5abb9a34f2e11966cd16398ae3f18e31a2958b:services/firebase.ts:gcp-api-key:12
+# 3998f2f). Projeto Firebase `fordcareapp` excluído em 27/09/2026, o que
+# invalida a chave. Triada depois da revogação (runbook IR-02).
+4f5abb9a34f2e11966cd16398ae3f18e31a2958b:services/firebase.ts:gcp-api-key:12
